@@ -18,9 +18,9 @@ Because JITModular distributes the processing for a single musical event among m
 
 2. Add the following to your startup file. (In the SuperCollider IDE, use *File -> Open startup file*).
 
-```
-(Platform.userExtensionDir +/+ "JITModular/psSet-event-type.scd").load;
-```
+   ```
+   (Platform.userExtensionDir +/+ "JITModular/psSet-event-type.scd").load;
+   ```
 
 3. Recompile the class library.
 
