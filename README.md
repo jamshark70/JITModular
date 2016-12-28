@@ -16,7 +16,7 @@ Because JITModular distributes the processing for a single musical event among m
 
 1. Place the `JITModular/` folder into your user extension directory. If you don't know the user extension directory, run the instruction `Platform.userExtensionDir` within SC.
 
-2. Add the following to your startup file. (In the SuperCollider IDE, use *File -> Open startup file*.
+2. Add the following to your startup file. (In the SuperCollider IDE, use *File -> Open startup file*).
 
 ```
 (Platform.userExtensionDir +/+ "JITModular/psSet-event-type.scd").load;
@@ -24,7 +24,7 @@ Because JITModular distributes the processing for a single musical event among m
 
 3. Recompile the class library.
 
-If you want to verify installation, the following instruction should return `PatternControl`.
+If you want to verify installation, the following instruction should return `PatternControl`. If it returns `nil`, then the file `psSet-event-type.scd` is not in the expected location.
 
 ```
 AbstractPlayControl.proxyControlClasses[\psSet];
