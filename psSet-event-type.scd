@@ -25,8 +25,11 @@ Event.addEventType(\psSet, {
 		}
 		{ ctl.isKindOf(SynthControl) } {
 			proxy.controlNames.do { |cn|
-				if(skipArgs.includes(cn.name.asSymbol).not and: {
-					(value = cn.name.asSymbol.envirGet).notNil
+				var cname = cn.name.asSymbol;
+				if(skipArgs.includes(cname).not and: {  // if... don't skip me
+					proxy.nodeMap[cname].isKindOf(BusPlug).not and: {  // and I'm not mapped to a proxy
+						(value = cname.envirGet).notNil  // and I have a value
+					}
 				}) {
 					proxy.set(cn.name, value);
 					if(cn.name == \gt and: { sustain.notNil }) {
