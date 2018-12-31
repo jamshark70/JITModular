@@ -228,3 +228,11 @@ StereoProxySynthDef : SynthDef {
 		^def
 	}
 }
+
+StereoProxySpace : ProxySpace {
+	makeProxy {
+		var proxy = StereoNodeProxy.new(server);
+		this.initProxy(proxy);
+		^proxy
+	}
+}
