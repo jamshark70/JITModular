@@ -1,9 +1,9 @@
 + Object {
 	makeStereoProxyControl { | channelOffset = 0, proxy |
-		if(/*proxy.rate.debug("rate fml") == \audio and: {*/ this.isKindOf(Function).debug("isFunction") /*}*/) {
+		if(this.isKindOf(Function)) {
 			^StereoSynthDefControl(this, channelOffset);
 		} {
-			^this.proxyControlClass.debug("falling back to proxyControlClass").new(this, channelOffset);
+			^this.proxyControlClass.new(this, channelOffset);
 		}
 	}
 
@@ -21,7 +21,7 @@
 				channelConstraint = proxy.numChannels;
 				rateConstraint = proxy.rate;
 			};
-			thisProcess.interpreter.a = defClass.debug("making one of these").new(
+			^defClass.debug("making one of these").new(
 				SystemSynthDefs.tempNamePrefix ++ proxy.generateUniqueName ++ index,
 				this.prepareForProxySynthDef(proxy, channelOffset),
 				proxy.nodeMap.ratesFor(argNames),
@@ -31,7 +31,6 @@
 				channelConstraint,
 				rateConstraint
 			);
-			^thisProcess.interpreter.a
 		} {
 			^this.buildForProxy(proxy, channelOffset, index)
 		};
