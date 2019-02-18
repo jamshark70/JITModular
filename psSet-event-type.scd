@@ -11,7 +11,7 @@ Event.addEventType(\psSet, {
 		{ ctl.isKindOf(StreamControl) and: { ctl.source.isNumber } } {
 			if(skipArgs.includes(name.asSymbol).not and: { (value = name.envirGet).notNil }) {
 				proxy.source = value;
-				if(name == \gt and: { sustain.notNil }) {
+				if(name == \gt and: { sustain.notNil and: { sustain < inf } }) {
 					if(releaseHolder.notNil) {
 						releaseHolder[proxy] = thisThread.clock.beats + sustain;
 					};
@@ -32,7 +32,7 @@ Event.addEventType(\psSet, {
 					}
 				}) {
 					proxy.set(cn.name, value);
-					if(cn.name == \gt and: { sustain.notNil }) {
+					if(cn.name == \gt and: { sustain.notNil and: { sustain < inf } }) {
 						if(releaseHolder.notNil) {
 							releaseHolder[proxy] = thisThread.beats + sustain;
 						};
@@ -74,7 +74,7 @@ AbstractPlayControl.buildMethods[\psSet] = { |pattern, proxy, channelOffset = 0,
 		\releaseHolder, `(IdentityDictionary.new),
 		#[isRest, gt, t_trig], Pfunc { |ev|
 			[
-				rest or: { ev[\isRest] ?? { false } },
+				rest or: { ev.isRest ?? { false } },
 				ev[\gt] ?? { 1 },
 				ev[\t_trig] ?? { 1 }
 			]
