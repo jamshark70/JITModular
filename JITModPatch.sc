@@ -53,21 +53,23 @@ JITModPatch {
 	load { |path|
 		var file = File(path, "r"), code, archive;
 		if(file.isOpen) {
-			protect {
-				this.clear;
-				code = file.readAllString;
-				archive = code.interpret;
-				this.initFromArchive(archive);
-			} { |error|
-				file.close;
-				defer {  // defer to allow error to clear before handling
-					if(error.notNil) {
-						this.changed(\load, \error, error);
-					} {
-						this.changed(\load, \success);
-					}
-				};
-			}
+			proxyspace.server.waitForBoot {
+				protect {
+					this.clear;
+					code = file.readAllString;
+					archive = code.interpret;
+					this.initFromArchive(archive);
+				} { |error|
+					file.close;
+					defer {  // defer to allow error to clear before handling
+						if(error.notNil) {
+							this.changed(\load, \error, error);
+						} {
+							this.changed(\load, \success);
+						}
+					};
+				}
+			};
 		} {
 			"JITModPatch:% could not open '%' for loading".format(name, path).warn;
 			this.changed(\load, \openFailed);
