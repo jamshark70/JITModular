@@ -164,6 +164,7 @@
 	asCode2 { | includeSettings = true, includeMonitor = true, envir |
 		var nameStr, srcStr, str, docStr, indexStr, key;
 		var space, spaceCS;
+		var specs;
 
 		var isAnon, isSingle, isInCurrent, isOnDefault, isMultiline;
 
@@ -225,6 +226,16 @@
 			// add settings to compile string
 			if(includeSettings) {
 				stream << this.nodeMap.asCode2(indexStr, true);
+				specs = Halo.at(this);
+				if(specs.notNil) {
+					specs = specs[\spec];
+					if(specs.notNil) {
+						specs.keysValuesDo { |key, spec|
+							stream <<< this << ".addSpec("
+							<<< key << ", " <<< spec << ");\n"
+						};
+					};
+				};
 			};
 			// include play settings if playing ...
 			// hmmm - also keep them if not playing,
