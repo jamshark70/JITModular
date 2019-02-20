@@ -233,6 +233,10 @@ StereoProxySpace : ProxySpace {
 	makeProxy {
 		var proxy = StereoNodeProxy.new(server);
 		this.initProxy(proxy);
+		// callback; note, we haven't saved the proxy into the space yet
+		// so we have to wait a tick
+		// note also that, without the number, 'defer' doesn't defer :-\
+		{ this.changed(\newProxy, proxy) }.defer(0);
 		^proxy
 	}
 }
