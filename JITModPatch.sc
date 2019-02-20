@@ -26,7 +26,7 @@ JITModPatch {
 		name = archive[\name];
 		proxyspace = archive[\proxyspace];
 		// buffers = archive[\buffers];
-		// midi = archive[\midi];
+		midi = archive[\midi];
 		this.initDoc(archive[\string]);
 		// JITModPatchGui(this);  // uses dependencies
 	}
@@ -40,12 +40,18 @@ JITModPatch {
 		proxyspace.clear;
 		proxyspace.remove;  // take it out of the global collection, for 'load'
 		// buffers.clear;
-		// midi.clear;
+		midi.free;
 		doc.close;
 	}
 
 	*load { |path|
-		^this.new.load(path)
+		var new = this.new;
+		if(path.notNil) {
+			^new.load(path)
+		};
+		// else (btw, later implement default path)
+		FileDialog({ |path| new.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true);
+		^new  // you can have it now but it will be ready later
 	}
 
 	load { |path|
@@ -75,6 +81,14 @@ JITModPatch {
 	}
 
 	save { |path|
+		if(path.notNil) {
+			this.prSave(path)
+		} {
+			FileDialog({ |path| this.prSave(path) }, fileMode: 0, acceptMode: 1, stripResult: true);
+		};
+	}
+
+	prSave { |path|
 		var file = File(path, "w");
 		if(file.isOpen) {
 			protect {
@@ -87,7 +101,7 @@ JITModPatch {
 				if(midi.notNil) {
 					file << "midi = ";
 					midi.storeOn(file);
-					file << ";\n";
+					file << "(proxyspace);\n";
 				};
 				file << "\nproxyspace.use {\n";
 				proxyspace.use { proxyspace.storeOn2(file) };
@@ -108,5 +122,35 @@ JITModPatch {
 			"JITModPatch:% could not open '%' for saving".format(name, path).warn;
 			this.changed(\save, \openFailed);
 		}
+	}
+
+	// proxyspace access
+	at { |key| ^proxyspace.at(key) }
+	put { |key, obj| proxyspace.put(key, obj) }
+
+	// midi
+	initMidi { |device, name, channel|
+		if(device.notNil) {
+			midi = JITModMIDI.newByName(proxyspace, device, name, channel);
+		} {
+			midi = JITModMIDI(proxyspace, channel);
+		}
+	}
+	clearMidi {
+		midi.free;
+		midi = nil;
+	}
+
+	learnCtl { |name, spec|
+		if(midi.isNil) { this.initMidi };
+		midi.learnCtl(name, spec);
+	}
+	addCtl { |num, name, spec|
+		if(midi.isNil) { this.initMidi };
+		midi.addCtl(num, name, spec);
+	}
+	removeCtl { |num, name|
+		if(midi.isNil) { this.initMidi };
+		midi.removeCtl(num, name);
 	}
 }

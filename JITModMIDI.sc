@@ -122,4 +122,18 @@ JITModMIDI {
 		midiFuncs[key][\resp].free;
 		midiFuncs[key] = nil;
 	}
+
+	storeOn { |stream|
+		stream << "{ |proxyspace|\n\tvar new = "
+		<< this.class.name << "(proxyspace);\n";
+		midiFuncs.keysValuesDo { |key, item|
+			// noteOn/Off are created automatically, don't need to save
+			if(#[noteOn, noteOff].includes(item[\name]).not) {
+				stream << "\tnew.addCtl(" <<< item[\num] << ", "
+				<<< item[\name] << ", "
+				<<< item[\spec] << ");\n";
+			};
+		};
+		stream << "}.value";
+	}
 }
