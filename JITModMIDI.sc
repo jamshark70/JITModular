@@ -61,6 +61,15 @@ JITModMIDI {
 		}
 	}
 
+	learnCtl { |name, spec|
+		var learnFunc;
+		learnFunc = MIDIFunc.cc({ |val, num|
+			"Adding CC% for %\n".postf(num, name);
+			this.addCtl(num, name, spec);
+			learnFunc.free;
+		}, srcID: uid);
+	}
+
 	addCtl { |num, name, spec|
 		var key = ("name" ++ num).asSymbol,
 		skip = [\freq, \amp, \pan, \gt, \t_trig],
