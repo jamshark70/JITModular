@@ -12,7 +12,7 @@
 		var argNames = this.argNames;
 		var defClass;
 		if(this.isKindOf(Function)) {
-			defClass = if(proxy.debug("proxy").isKindOf(StereoNodeProxy).debug("it's stereo") /*and: { proxy.rate.debug("rate") == \audio }*/) {
+			defClass = if(proxy.isKindOf(StereoNodeProxy)) {
 				StereoProxySynthDef
 			} {
 				ProxySynthDef
@@ -21,7 +21,7 @@
 				channelConstraint = proxy.numChannels;
 				rateConstraint = proxy.rate;
 			};
-			^defClass.debug("making one of these").new(
+			^defClass.new(
 				SystemSynthDefs.tempNamePrefix ++ proxy.generateUniqueName ++ index,
 				this.prepareForProxySynthDef(proxy, channelOffset),
 				proxy.nodeMap.ratesFor(argNames),
