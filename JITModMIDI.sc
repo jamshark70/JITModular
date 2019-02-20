@@ -85,7 +85,7 @@ JITModMIDI {
 	}
 
 	addCtl { |num, name, spec|
-		var key = ("name" ++ num).asSymbol,
+		var key = (name ++ num).asSymbol,
 		skip = [\freq, \amp, \pan, \gt, \t_trig],
 		ctl;
 		skip.remove(name);
@@ -112,7 +112,7 @@ JITModMIDI {
 	}
 
 	removeCtl { |num, name|
-		var key = ("name" ++ num).asSymbol;
+		var key = (name ++ num).asSymbol;
 		midiFuncs[key].free;
 		midiFuncs[key] = nil;
 	}
