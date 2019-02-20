@@ -1,30 +1,30 @@
 JITModMIDI {
 	var <proxyspace;
+	var <channel;
 	var uid, midiFuncs, notes;
 
-	*new { |proxyspace|
+	*new { |proxyspace, channel|
 		if(MIDIClient.initialized.not) {
-			MIDIClient.init;
 			MIDIIn.connectAll;
 		};
-		^super.new.init(proxyspace)
+		^super.new.init(proxyspace, channel)
 	}
 
-	*newByName { |proxyspace, device(""), name("")|
+	*newByName { |proxyspace, device(""), name(""), channel|
 		var dev;
 		if(MIDIClient.initialized.not) {
-			MIDIClient.init;
 			MIDIIn.connectAll;
 		};
 		dev = MIDIClient.sources.detect { |endpt|
 			device.matchRegexp(endpt.device) and: { name.matchRegexp(endpt.name) }
 		};
-		^super.new.init(proxyspace, dev)
+		^super.new.init(proxyspace, dev, channel)
 	}
 
-	init { |space, device|
+	init { |space, device, chan|
 		if(device.notNil) { uid = device.uid };
 		proxyspace = space;
+		channel = chan;
 		notes = Array.new;
 		midiFuncs = IdentityDictionary.new;
 		[
@@ -35,12 +35,26 @@ JITModMIDI {
 				this.noteOff(num, vel)
 			}
 		].pairsDo { |name, func|
-			midiFuncs.put(name, MIDIFunc.perform(name, func, srcID: uid));
+			midiFuncs.put(name, MIDIFunc.perform(name, func, chan: chan, srcID: uid));
 		};
 	}
 
 	free {
 		midiFuncs.do { |resp| resp.free };
+	}
+
+	channel_ { |chan|
+		var new;
+		if(chan.isNil or: { chan.inclusivelyBetween(0, 15) }) {
+			channel = chan;
+			midiFuncs.keysValuesDo { |key, resp|
+				new = MIDIFunc(resp.func, resp.msgNum, chan, resp.msgType, resp.srcID);
+				resp.free;
+				midiFuncs[key] = new;
+			};
+		} {
+			"MIDI channel should be 0-15, was %".format(chan).warn;
+		}
 	}
 
 	noteOn { |num, vel|
@@ -94,7 +108,7 @@ JITModMIDI {
 			(type: \psSet, proxyspace: proxyspace, skipArgs: skip)
 			.put(name, spec.map(val / 127.0))
 			.play;
-		}, num, srcID: uid));
+		}, num, chan: channel, srcID: uid));
 	}
 
 	removeCtl { |num, name|
