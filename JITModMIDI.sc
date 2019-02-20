@@ -35,22 +35,25 @@ JITModMIDI {
 				this.noteOff(num, vel)
 			}
 		].pairsDo { |name, func|
-			midiFuncs.put(name, MIDIFunc.perform(name, func, chan: chan, srcID: uid));
+			midiFuncs.put(name,
+				(name: name, resp: MIDIFunc.perform(name, func, chan: chan, srcID: uid))
+			);
 		};
 	}
 
 	free {
-		midiFuncs.do { |resp| resp.free };
+		midiFuncs.do { |item| item[\resp].free };
 	}
 
 	channel_ { |chan|
 		var new;
 		if(chan.isNil or: { chan.inclusivelyBetween(0, 15) }) {
 			channel = chan;
-			midiFuncs.keysValuesDo { |key, resp|
+			midiFuncs.keysValuesDo { |key, item|
+				var resp = item[\resp];
 				new = MIDIFunc(resp.func, resp.msgNum, chan, resp.msgType, resp.srcID);
 				resp.free;
-				midiFuncs[key] = new;
+				item[\resp] = new;
 			};
 		} {
 			"MIDI channel should be 0-15, was %".format(chan).warn;
@@ -104,16 +107,19 @@ JITModMIDI {
 			};
 		};
 		spec = spec.asSpec;
-		midiFuncs.put(key, MIDIFunc.cc({ |val, num|
-			(type: \psSet, proxyspace: proxyspace, skipArgs: skip)
-			.put(name, spec.map(val / 127.0))
-			.play;
-		}, num, chan: channel, srcID: uid));
+		midiFuncs.put(key, (
+			name: name, num: num, spec: spec,
+			resp: MIDIFunc.cc({ |val, num|
+				(type: \psSet, proxyspace: proxyspace, skipArgs: skip)
+				.put(name, spec.map(val / 127.0))
+				.play;
+			}, num, chan: channel, srcID: uid)
+		));
 	}
 
 	removeCtl { |num, name|
 		var key = (name ++ num).asSymbol;
-		midiFuncs[key].free;
+		midiFuncs[key][\resp].free;
 		midiFuncs[key] = nil;
 	}
 }
