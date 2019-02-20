@@ -32,9 +32,7 @@ JITModPatch {
 	}
 
 	initDoc { |string("")|
-		doc = Document.new("JITModPatch: " ++ name, envir: proxyspace)
-		.string_(string)
-		.front;
+		doc = Document.new("JITModPatch: " ++ name, string, envir: proxyspace).front;
 	}
 
 	clear {
@@ -86,12 +84,16 @@ JITModPatch {
 				file << "var doc = " <<< doc.string << ";\n";
 				// buffers.save(path, file);
 				// file << "buffers = JITModBufferSet.load(path);\n\n";
-				// midi.save(path, file);
+				if(midi.notNil) {
+					file << "midi = ";
+					midi.storeOn(file);
+					file << ";\n";
+				};
 				file << "\nproxyspace.use {\n";
-				proxyspace.use { proxyspace.storeOn(file) };
+				proxyspace.use { proxyspace.storeOn2(file) };
 				file << "\};\n";
 				// result for loading, should embed real objects
-				file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc)\n";
+				file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi)\n";
 			} { |error|
 				file.close;
 				defer {  // defer to allow error to clear before handling
