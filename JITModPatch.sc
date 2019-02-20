@@ -5,6 +5,8 @@ JITModPatch {
 	var <path;
 	var <dirty = false;  // I'm not sure I can really support this?
 
+	var controllers;  // track changes in proxyspace
+
 	*new { |server, name|
 		^super.new.init(server, name)
 	}
@@ -19,6 +21,7 @@ JITModPatch {
 		proxyspace = StereoProxySpace(server, name);
 		// buffers = JITModBufferSet.new;
 		this.initDoc;
+		this.initController;
 		// JITModPatchGui(this);  // uses dependencies
 	}
 
@@ -28,6 +31,7 @@ JITModPatch {
 		// buffers = archive[\buffers];
 		midi = archive[\midi];
 		this.initDoc(archive[\string]);
+		this.initController;
 		// JITModPatchGui(this);  // uses dependencies
 	}
 
@@ -35,8 +39,30 @@ JITModPatch {
 		doc = Document.new("JITModPatch: " ++ name, string, envir: proxyspace).front;
 	}
 
+	initController {
+		var makeCtl = { |proxy|
+			// we might not be in the environment at this point
+			var key = proxyspace.use { proxy.key };
+			controllers[key] = SimpleController(proxy)
+			.put(\source, { dirty = true })
+			// .put(\clear, { ... remove ctl? ... })
+		};
+		if(controllers.isNil) { controllers = IdentityDictionary.new };
+		controllers[\proxyspace] = SimpleController(proxyspace)
+		.put(\newProxy, { |obj, what, proxy|
+			// add buffers into nodemap
+			// this will add weight to the saved file but, no choice
+			makeCtl.(proxy);
+		});
+		proxyspace.keysValuesDo { |key, proxy|
+			makeCtl.(proxy);
+		};
+	}
+
 	clear {
 		// if(dirty) {};  // ???
+		controllers.do { |ctl| ctl.remove };
+		controllers.clear;
 		proxyspace.clear;
 		proxyspace.remove;  // take it out of the global collection, for 'load'
 		// buffers.clear;
