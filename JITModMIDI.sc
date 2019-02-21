@@ -43,6 +43,7 @@ JITModMIDI {
 
 	free {
 		midiFuncs.do { |item| item[\resp].free };
+		this.changed(\didFree);
 	}
 
 	channel_ { |chan|
@@ -55,6 +56,7 @@ JITModMIDI {
 				resp.free;
 				item[\resp] = new;
 			};
+			this.changed(\channel, chan);
 		} {
 			"MIDI channel should be 0-15, was %".format(chan).warn;
 		}
@@ -65,6 +67,7 @@ JITModMIDI {
 		notes = notes.add(num);
 		(type: \psSet, proxyspace: proxyspace, midinote: num, amp: vel / 127.0,
 			skipArgs: #[pan], gt: 1, t_trig: 1, sustain: inf).play;
+		this.changed(\noteOn, num, vel);
 	}
 
 	noteOff { |num, vel|
@@ -75,7 +78,8 @@ JITModMIDI {
 		} {
 			(type: \psSet, proxyspace: proxyspace,
 				skipArgs: #[freq, amp, pan], gt: 0, t_trig: 0, sustain: inf).play;
-		}
+		};
+		this.changed(\noteOff, num, notes.last);
 	}
 
 	learnCtl { |name, spec|
@@ -115,12 +119,14 @@ JITModMIDI {
 				.play;
 			}, num, chan: channel, srcID: uid)
 		));
+		this.changed(\addCtl, num, name, spec);
 	}
 
 	removeCtl { |num, name|
 		var key = (name ++ num).asSymbol;
 		midiFuncs[key][\resp].free;
 		midiFuncs[key] = nil;
+		this.changed(\removeCtl, num, name);
 	}
 
 	storeOn { |stream|

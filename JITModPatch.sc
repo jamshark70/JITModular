@@ -32,6 +32,7 @@ JITModPatch {
 		midi = archive[\midi];
 		this.initDoc(archive[\string]);
 		this.initController;
+		if(midi.notNil) { this.initMidiCtl };
 		// JITModPatchGui(this);  // uses dependencies
 	}
 
@@ -44,7 +45,7 @@ JITModPatch {
 			// we might not be in the environment at this point
 			var key = proxyspace.use { proxy.key };
 			controllers[key] = SimpleController(proxy)
-			.put(\source, { dirty = true })
+			.put(\source, { this.dirty = true })
 			// .put(\clear, { ... remove ctl? ... })
 		};
 		if(controllers.isNil) { controllers = IdentityDictionary.new };
@@ -150,6 +151,11 @@ JITModPatch {
 		}
 	}
 
+	dirty_ { |bool|
+		dirty = bool;
+		this.changed(\dirty, bool);
+	}
+
 	// proxyspace access
 	at { |key| ^proxyspace.at(key) }
 	put { |key, obj| proxyspace.put(key, obj) }
@@ -160,7 +166,16 @@ JITModPatch {
 			midi = JITModMIDI.newByName(proxyspace, device, name, channel);
 		} {
 			midi = JITModMIDI(proxyspace, channel);
-		}
+		};
+		this.dirty = true;
+	}
+	initMidiCtl {
+		if(midi.isNil) { this.initMidi };
+		controllers[\midi] = SimpleController(midi)
+		.put(\didFree, { controllers[\midi].remove; midi = nil; });
+		#[channel, addCtl, removeCtl].do { |key|
+			controllers[\midi].put(key, { this.dirty = true });
+		};
 	}
 	clearMidi {
 		midi.free;
