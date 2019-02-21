@@ -104,3 +104,29 @@ Document.current.envir
 // hum, something wrong with Document environments, closing maybe?
 d = Document("test", "currentEnvironment;\nd.close", (a: 2));
 Document.current.envir
+
+s.boot; p = JITModPatch(s, \test3);
+p.save;
+
+
+// buffers in patterns
+a = NodeProxy(s, \audio, 2);
+
+a.source = Pbind(\degree, Pwhite(-14, 14, inf), \dur, 1, \test, Pfunc { |ev| ev[\abc].debug("abc in proto"); 0 }).trace;
+
+a.nodeMap
+
+a.source = Pbind(\degree, Pwhite(-14, 14, inf), \dur, 1, \play, { ~finish.value; currentEnvironment.debug("play") });
+
+a.set(\abc, 1);  // picked up by ~finish!
+
+a.clear;
+
+// ok, try it for real -- a11 does get sent -- simple patterns are OK
+// but a11 is not available for calculations
+p = JITModPatch(s, \buf2);
+p.save;
+p.clear;
+
+
+Pattern.findRespondingMethodFor(\makeProxyControl)
