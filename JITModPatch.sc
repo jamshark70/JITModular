@@ -41,7 +41,7 @@ JITModPatch {
 	}
 
 	initDoc { |string("")|
-		doc = Document.new("JITModPatch: " ++ name, string, envir: proxyspace).front;
+		doc = Document.new("JITModPatch: " ++ name, string, envir: proxyspace);
 	}
 
 	initController {
