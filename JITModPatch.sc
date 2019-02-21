@@ -6,6 +6,7 @@ JITModPatch {
 	var <dirty = false;  // I'm not sure I can really support this?
 
 	var controllers;  // track changes in proxyspace
+	var bufPairs;
 
 	*new { |server, name|
 		^super.new.init(server, name)
@@ -19,7 +20,7 @@ JITModPatch {
 		name = argName;
 		if(server.isNil) { server = Server.default };
 		proxyspace = StereoProxySpace(server, name);
-		// buffers = JITModBufferSet.new;
+		buffers = JITModBufferSet(this);
 		this.initDoc;
 		this.initController;
 		// JITModPatchGui(this);  // uses dependencies
@@ -29,7 +30,8 @@ JITModPatch {
 	initFromArchive { |archive|
 		name = archive[\name];
 		proxyspace = archive[\proxyspace];
-		// buffers = archive[\buffers];
+		buffers = archive[\buffers] ?? { JITModBufferSet(this) };
+		bufPairs = buffers.asKeyValuePairs;
 		midi = archive[\midi];
 		this.initDoc(archive[\string]);
 		this.initController;
@@ -56,11 +58,23 @@ JITModPatch {
 			// add buffers into nodemap
 			// this will add weight to the saved file but, no choice
 			makeCtl.(proxy);
+			if(bufPairs.notNil) { proxy.set(*bufPairs) };
 			this.dirty = true;
 		});
 		proxyspace.keysValuesDo { |key, proxy|
 			makeCtl.(proxy);
 		};
+		controllers[\buffers] = SimpleController(buffers)
+		.put(\addBuffer, {
+			bufPairs = buffers.asKeyValuePairs;
+			proxyspace.do { |proxy| proxy.set(*bufPairs) };
+		})
+		.put(\removeBuffer, {
+			bufPairs = buffers.asKeyValuePairs;
+			// I don't know how to remove something from a nodeMap
+		})
+		// .put(\didFree, {})
+		;
 	}
 
 	clear {
@@ -69,7 +83,7 @@ JITModPatch {
 		controllers.clear;
 		proxyspace.clear;
 		proxyspace.remove;  // take it out of the global collection, for 'load'
-		// buffers.clear;
+		buffers.clear;
 		midi.free;
 		doc.close;
 		this.changed(\didFree);
@@ -86,16 +100,19 @@ JITModPatch {
 	}
 
 	load { |p|
-		var file = File(p, "r"), code, archive;
+		var file = File(p, "r"), code, archive, saveExecutingPath;
 		if(file.isOpen) {
 			path = p;
 			proxyspace.server.waitForBoot {
 				protect {
 					this.clear;
 					code = file.readAllString;
+					saveExecutingPath = thisProcess.nowExecutingPath;
+					thisProcess.nowExecutingPath = p;
 					archive = code.interpret;
 					this.initFromArchive(archive);
 				} { |error|
+					thisProcess.nowExecutingPath = saveExecutingPath;
 					file.close;
 					defer {  // defer to allow error to clear before handling
 						if(error.notNil) {
@@ -128,8 +145,10 @@ JITModPatch {
 				file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
 				.format(proxyspace.class.name, name.asCompileString);
 				file << "var doc = " <<< doc.string << ";\n";
-				// buffers.save(path, file);
-				// file << "buffers = JITModBufferSet.load(path);\n\n";
+				if(buffers.notEmpty) {
+					buffers.save(path);
+					buffers.storeOn(file);
+				};
 				if(midi.notNil) {
 					file << "midi = ";
 					midi.storeOn(file);
@@ -139,7 +158,7 @@ JITModPatch {
 				proxyspace.use { proxyspace.storeOn2(file) };
 				file << "\};\n";
 				// result for loading, should embed real objects
-				file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi)\n";
+				file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers)\n";
 			} { |error|
 				file.close;
 				defer {  // defer to allow error to clear before handling
@@ -199,6 +218,27 @@ JITModPatch {
 		if(midi.isNil) { this.initMidi };
 		midi.removeCtl(num, name);
 	}
+
+	// buffers
+	readBuf { |name, path, startFrame = 0, numFrames = -1, action|
+		var buf = Buffer.read(proxyspace.server, path, startFrame, numFrames, action);
+		buffers.put(name, buf);
+		^buf
+	}
+
+	readBufChannel { |name, path, startFrame = 0, numFrames = -1, channels, action|
+		var buf;
+		if(channels.isNil) {
+			Error("JITModPatch:readBufChannel: Please supply a 'channels' array").throw;
+		};
+		buf = Buffer.readChannel(proxyspace.server, path, startFrame, numFrames, channels, action);
+		buffers.put(name, buf);
+		^buf
+	}
+
+	freeBuf { |name|
+		buffers.removeAt(name);
+	}
 }
 
 JITModPatchGui {
@@ -246,5 +286,130 @@ JITModPatchGui {
 			// this.close;
 			controllers.do(_.remove);
 		});
+	}
+}
+
+JITModBufferSet {
+	var <>model, <server, <buffers, <path;
+	// path should be the full path of the .jitmod file -- set in 'save'
+
+	// for loading, we won't have the JITModPatch right now
+	// so, hack: 'model' may be a server. You fill in the 'model' later
+	*new { |model|
+		^super.newCopyArgs(model).init;
+	}
+
+	init {
+		if(model.isKindOf(Server)) {
+			server = model;
+			model = nil;
+		} {
+			server = model.proxyspace.server;
+		};
+		buffers = IdentityDictionary.new;
+	}
+
+	clear {
+		buffers.do(_.free);
+		buffers.clear;
+		this.changed(\didFree);
+	}
+
+	isEmpty { ^buffers.isEmpty }
+	notEmpty { ^buffers.notEmpty }
+
+	at { |name| ^buffers[name.asSymbol] }
+
+	put { |name, buffer|
+		name = name.asSymbol;
+		if(buffer.isNil) { ^this.removeAt(name) };
+		if(buffers[name].notNil) {
+			"Buffer '%' already exists; use a different name".format(name).warn;
+		} {
+			buffers[name] = buffer;
+			this.changed(\addBuffer, name, buffer);
+		}
+	}
+
+	removeAt { |name|
+		name = name.asSymbol;
+		if(buffers[name].notNil) {
+			buffers[name].free;
+			buffers[name] = nil;
+			this.changed(\removeBuffer, name);
+		}
+	}
+
+	dir { |p|
+		^(p.dirname +/+ p.basename.splitext[0] ++ "_buffers")
+	}
+	save { |p|  // p = path to .jitmod file, not directory!
+		var dir = this.dir(p);
+		if(File.exists(dir) and: { File.type(dir) != \directory }) {
+			"% already exists and is not a directory; can't save here".format(dir).warn;
+			^false
+		};
+		if(File.exists(dir)) {
+			(dir +/+ "*").pathMatch.do { |path| File.delete(path) };
+		} {
+			File.mkdir(dir);
+		};
+		buffers.keysValuesDo { |name, buffer|
+			buffer.write(dir +/+ name ++ ".wav", "wav", "float");
+		};
+		path = p;
+	}
+
+	load { |path|
+		var dir = this.dir(path), name;
+		if(File.exists(dir) and: { File.type(dir) == \directory }) {
+			this.clear;
+			(dir +/+ "*.wav").pathMatch.do { |path|
+				name = path.basename.splitext[0].asSymbol;
+				buffers[name] = Buffer.read(server, path);
+			};
+			^true
+		} {
+			"'%' directory doesn't exist; can't load buffers".format(dir).warn;
+			^false
+		}
+	}
+
+	storeOn { |stream|
+		// user should have called 'save' already
+		// we'll check
+		var dir;
+		if(path.notNil) { dir = this.dir(path) };
+		if(dir.notNil and: { File.exists(dir) and: { File.type(dir) == \directory } }) {
+			// for loading, always relative path
+			stream << "\nbuffers = JITModBufferSet(Server.default);\n";
+			stream << "if(buffers.load(thisProcess.nowExecutingPath.dirname +/+ \"%\").not) { Error(\"Buffer loading failed\").throw };\n".format(path.basename);
+			stream << "Server.default.sync;\n\n";
+		} {
+			Error("JITModBufferSet directory doesn't exist; storeOn can't proceed").throw;
+		};
+	}
+
+	asKeyValuePairs {
+		var pairs = Array(buffers.size * 2);
+		buffers.keysDo { |name|
+			pairs.add(name).add(this.asRef(name));
+		};
+		^pairs
+	}
+
+	asRef { |name|
+		^JITModBufferRef(name, buffers[name])
+	}
+}
+
+JITModBufferRef {
+	var <name, <buffer;
+	*new { |name, buffer|
+		^super.newCopyArgs(name, buffer)
+	}
+	asControlInput { ^buffer.bufnum }
+	storeOn { |stream|
+		stream << "buffers.asRef(" <<< name << ")"
 	}
 }

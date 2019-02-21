@@ -65,3 +65,42 @@ d.selectRange(0, 1 << 24);
 d.string
 
 p.doc.string
+
+
+
+
+// try with buffers
+s.boot; p = JITModPatch(s, \bufs);
+p.readBuf(\a11, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
+
+p.buffers.buffers
+
+p[\out].nodeMap
+
+p.readBuf(\a11, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
+
+~out = { \in.ar(0!2) }; ~out.play(vol: 0.2);
+~src = { |a11| PlayBuf.ar(1, a11, loop: 1) };
+~src <>> ~out;
+
+p.clear;
+p.buffers.buffers
+
+p.save;
+
+p.buffers.asRef(\a11).asControlInput
+
+p = JITModPatch.load;
+
+d = DebugNetAddr("127.0.0.1", 57110);
+e = s.addr;
+
+s.addr = d;
+s.addr = e;
+
+currentEnvironment
+Document.current.envir
+
+// hum, something wrong with Document environments, closing maybe?
+d = Document("test", "currentEnvironment;\nd.close", (a: 2));
+Document.current.envir
