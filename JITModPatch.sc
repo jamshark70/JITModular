@@ -23,6 +23,7 @@ JITModPatch {
 		this.initDoc;
 		this.initController;
 		// JITModPatchGui(this);  // uses dependencies
+		this.dirty = false;
 	}
 
 	initFromArchive { |archive|
@@ -34,6 +35,7 @@ JITModPatch {
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
 		// JITModPatchGui(this);  // uses dependencies
+		this.dirty = false;
 	}
 
 	initDoc { |string("")|
@@ -54,6 +56,7 @@ JITModPatch {
 			// add buffers into nodemap
 			// this will add weight to the saved file but, no choice
 			makeCtl.(proxy);
+			this.dirty = true;
 		});
 		proxyspace.keysValuesDo { |key, proxy|
 			makeCtl.(proxy);
@@ -69,6 +72,7 @@ JITModPatch {
 		// buffers.clear;
 		midi.free;
 		doc.close;
+		this.changed(\didFree);
 	}
 
 	*load { |path|
@@ -81,9 +85,10 @@ JITModPatch {
 		^new  // you can have it now but it will be ready later
 	}
 
-	load { |path|
-		var file = File(path, "r"), code, archive;
+	load { |p|
+		var file = File(p, "r"), code, archive;
 		if(file.isOpen) {
+			path = p;
 			proxyspace.server.waitForBoot {
 				protect {
 					this.clear;
@@ -193,5 +198,53 @@ JITModPatch {
 	removeCtl { |num, name|
 		if(midi.isNil) { this.initMidi };
 		midi.removeCtl(num, name);
+	}
+}
+
+JITModPatchGui {
+	var <model,
+	<view,
+	saveButton, saveAsButton, loadButton,
+	controllers;
+
+	*new { |model, parent, bounds|
+		var view;
+		if(parent.isNil) {
+			parent = Window("JITModPatch: %".format(model.name), Rect(800, 200, 500, 400)).front;
+			if(bounds.isNil) { bounds = parent.view.bounds.insetBy(5, 5) };
+		};
+		view = View(parent, bounds);
+		^super.newCopyArgs(model).init(view)
+	}
+
+	*newForLayout { |model|
+		var view = View();
+		^super.newCopyArgs(model).init(view)
+	}
+
+	init { |argView|
+		view = argView;
+		view.layout = VLayout(
+			saveButton = Button(),
+			saveAsButton = Button(),
+			loadButton = Button()
+		);
+		saveButton.states_([["save"]])
+		.action_({ model.save(model.path) });  // model.path may be nil; gives file dialog
+		saveAsButton.states_([["save as"]])
+		.action_({ model.save(nil) });
+		loadButton.states_([["load"]])
+		.action_({
+			FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true);
+		});
+		controllers = IdentityDictionary.new;
+		controllers[\patch] = SimpleController(model)
+		.put(\dirty, { |obj, what, bool|
+			defer { saveButton.enabled = bool };
+		})
+		.put(\didFree, {
+			// this.close;
+			controllers.do(_.remove);
+		});
 	}
 }
