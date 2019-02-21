@@ -137,9 +137,10 @@ JITModPatch {
 		};
 	}
 
-	prSave { |path|
-		var file = File(path, "w");
+	prSave { |p|
+		var file = File(p, "w");
 		if(file.isOpen) {
+			path = p;
 			protect {
 				// file's end result should be the patch
 				file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
