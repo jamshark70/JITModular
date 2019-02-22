@@ -95,14 +95,15 @@ JITModPatch {
 			^new.load(path)
 		};
 		// else (btw, later implement default path)
-		FileDialog({ |path| new.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true);
+		FileDialog({ |path| new.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
+			path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		^new  // you can have it now but it will be ready later
 	}
 
 	load { |p|
 		var file = File(p, "r"), code, archive, saveExecutingPath;
 		if(file.isOpen) {
-			path = p;
+			this.path = p;
 			proxyspace.server.waitForBoot {
 				protect {
 					this.clear;
@@ -133,14 +134,15 @@ JITModPatch {
 		if(path.notNil) {
 			this.prSave(path)
 		} {
-			FileDialog({ |path| this.prSave(path) }, fileMode: 0, acceptMode: 1, stripResult: true);
+			FileDialog({ |path| this.prSave(path) }, fileMode: 0, acceptMode: 1, stripResult: true,
+				path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		};
 	}
 
 	prSave { |p|
 		var file = File(p, "w");
 		if(file.isOpen) {
-			path = p;
+			this.path = p;
 			protect {
 				// file's end result should be the patch
 				file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
@@ -174,6 +176,11 @@ JITModPatch {
 			"JITModPatch:% could not open '%' for saving".format(name, path).warn;
 			this.changed(\save, \openFailed);
 		}
+	}
+
+	path_ { |p|
+		path = p;
+		Archive.put(\JITModPatch, \lastPath, path);
 	}
 
 	dirty_ { |bool|
@@ -276,7 +283,8 @@ JITModPatchGui {
 		.action_({ model.save(nil) });
 		loadButton.states_([["load"]])
 		.action_({
-			FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true);
+			FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
+				path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		});
 		controllers = IdentityDictionary.new;
 		controllers[\patch] = SimpleController(model)
