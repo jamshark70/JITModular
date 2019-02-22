@@ -421,4 +421,9 @@ JITModBufferRef {
 	storeOn { |stream|
 		stream << "buffers.asRef(" <<< name << ")"
 	}
+	bufnum { ^buffer.bufnum }
+	numFrames { ^buffer.numFrames }
+	numChannels { ^buffer.numChannels }
+	sampleRate { ^buffer.sampleRate }
+	duration { ^buffer.duration }
 }
