@@ -19,10 +19,13 @@ JITModPatch {
 	init { |server, argName, array|
 		name = argName;
 		if(server.isNil) { server = Server.default };
+		// .load boots the server automatically; .new doesn't
+		if(server.serverRunning.not) { server.boot };
 		proxyspace = StereoProxySpace(server, name);
 		buffers = JITModBufferSet(this);
 		this.initDoc;
 		this.initController;
+		proxyspace.use { proxyspace.gui };
 		// JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;
 	}
@@ -36,6 +39,7 @@ JITModPatch {
 		this.initDoc(archive[\string]);
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
+		proxyspace.use { proxyspace.gui };
 		// JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;
 	}
@@ -244,6 +248,10 @@ JITModPatch {
 		^buf
 	}
 
+	addBuf { |name, buffer, replace = false|
+		buffers.put(name, buffer, replace);
+	}
+
 	freeBuf { |name|
 		buffers.removeAt(name);
 	}
@@ -329,12 +337,16 @@ JITModBufferSet {
 
 	at { |name| ^buffers[name.asSymbol] }
 
-	put { |name, buffer|
+	put { |name, buffer, replace(false)|
+		var old;
 		name = name.asSymbol;
 		if(buffer.isNil) { ^this.removeAt(name) };
-		if(buffers[name].notNil) {
+		old = buffers[name];
+		if(replace.not and: { old.notNil }) {
 			"Buffer '%' already exists; use a different name".format(name).warn;
 		} {
+			// wait a bit, to allow new bufnum to propagate out to synths
+			{ old.free }.defer(1);
 			buffers[name] = buffer;
 			this.changed(\addBuffer, name, buffer);
 		}
