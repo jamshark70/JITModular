@@ -6,7 +6,6 @@ JITModPatch {
 	var <dirty = false;  // I'm not sure I can really support this?
 
 	var controllers;  // track changes in proxyspace
-	var bufPairs;
 
 	*new { |server, name|
 		^super.new.init(server, name)
@@ -34,7 +33,6 @@ JITModPatch {
 		name = archive[\name];
 		proxyspace = archive[\proxyspace];
 		buffers = archive[\buffers] ?? { JITModBufferSet(this) };
-		bufPairs = buffers.asKeyValuePairs;
 		midi = archive[\midi];
 		this.initDoc(archive[\string]);
 		this.initController;
@@ -59,23 +57,18 @@ JITModPatch {
 		if(controllers.isNil) { controllers = IdentityDictionary.new };
 		controllers[\proxyspace] = SimpleController(proxyspace)
 		.put(\newProxy, { |obj, what, proxy|
-			// add buffers into nodemap
-			// this will add weight to the saved file but, no choice
 			makeCtl.(proxy);
-			if(bufPairs.notNil) { proxy.set(*bufPairs) };
 			this.dirty = true;
 		});
 		proxyspace.keysValuesDo { |key, proxy|
 			makeCtl.(proxy);
 		};
 		controllers[\buffers] = SimpleController(buffers)
-		.put(\addBuffer, {
-			bufPairs = buffers.asKeyValuePairs;
-			proxyspace.do { |proxy| proxy.set(*bufPairs) };
+		.put(\addBuffer, { |obj, what, name|
+			proxyspace.put(name, buffers.asRef(name));
 		})
-		.put(\removeBuffer, {
-			bufPairs = buffers.asKeyValuePairs;
-			// I don't know how to remove something from a nodeMap
+		.put(\removeBuffer, { |obj, what, name|
+			proxyspace.at(name).clear;
 		})
 		// .put(\didFree, {})
 		;
@@ -433,9 +426,22 @@ JITModBufferRef {
 	storeOn { |stream|
 		stream << "buffers.asRef(" <<< name << ")"
 	}
+	printOn { |stream|
+		stream << "JITModBufferRef(" <<< name << ", " << buffer << ")"
+	}
 	bufnum { ^buffer.bufnum }
 	numFrames { ^buffer.numFrames }
 	numChannels { ^buffer.numChannels }
 	sampleRate { ^buffer.sampleRate }
 	duration { ^buffer.duration }
+
+	// save buffer refs in proxies; set bus to bufnum
+	// see Array:buildForProxy - returns bus-setting Event
+	// for bufnums we do not want to xfade
+	buildForProxy { |proxy, channelOffset = 0|
+		proxy.initBus(\control, 1);
+		^(type: \bus, array: [this.bufnum], out: proxy.bus.index)
+	}
+
+	proxyControlClass { ^StreamControl }
 }
