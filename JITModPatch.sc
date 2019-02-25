@@ -60,7 +60,11 @@ JITModPatch {
 			.put(\source, { this.dirty = true })
 			// .put(\clear, { ... remove ctl? ... })
 		};
-		if(controllers.isNil) { controllers = IdentityDictionary.new };
+		if(controllers.isNil) {
+			controllers = IdentityDictionary.new
+		} {
+			controllers.do(_.remove);
+		};
 		controllers[\proxyspace] = SimpleController(proxyspace)
 		.put(\newProxy, { |obj, what, proxy|
 			makeCtl.(proxy);
@@ -161,7 +165,13 @@ JITModPatch {
 					midi.storeOn(file);
 					file << "(proxyspace);\n";
 				};
-				file << "\nproxyspace.use {\n";
+				file << "\nproxyspace.use {\n\n";
+				// guarantee that buffer proxies get populated first
+				// otherwise patterns may look for ~xyz.source and find nothing
+				buffers.buffers.keysValuesDo { |name, buf|
+					file << "~" << name << " = buffers.asRef(" <<< name << ");\n";
+				};
+				file << "\n";
 				proxyspace.use { proxyspace.storeOn2(file) };
 				file << "\};\n";
 				// result for loading, should embed real objects
