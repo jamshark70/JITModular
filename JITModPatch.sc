@@ -1,7 +1,7 @@
 JITModPatch {
 	var <>name;
 	var <>proxyspace, <>buffers, <>midi;
-	var <>doc;
+	var <>doc, gui;
 	var <path;
 	var <dirty = false;  // I'm not sure I can really support this?
 
@@ -24,7 +24,10 @@ JITModPatch {
 		buffers = JITModBufferSet(this);
 		this.initDoc;
 		this.initController;
-		proxyspace.use { proxyspace.gui };
+		if(gui.isNil or: { gui.object !== proxyspace }) {
+			gui.tryPerform(\close);
+			proxyspace.use { gui = proxyspace.gui };
+		};
 		// JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;
 	}
@@ -37,7 +40,10 @@ JITModPatch {
 		this.initDoc(archive[\string]);
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
-		proxyspace.use { proxyspace.gui };
+		if(gui.isNil or: { gui.object !== proxyspace }) {
+			gui.tryPerform(\close);
+			proxyspace.use { gui = proxyspace.gui };
+		};
 		// JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;
 	}
@@ -83,6 +89,7 @@ JITModPatch {
 		buffers.clear;
 		midi.free;
 		doc.close;
+		gui.close; gui = nil;
 		this.changed(\didFree);
 	}
 
