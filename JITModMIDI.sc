@@ -1,4 +1,4 @@
-JITModMIDI {
+JMMIDI {
 	var <proxyspace;
 	var <channel;
 	var uid, midiFuncs, notes;
