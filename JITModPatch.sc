@@ -414,7 +414,7 @@ JMBufferSet {
 		if(dir.notNil and: { File.exists(dir) and: { File.type(dir) == \directory } }) {
 			// for loading, always relative path
 			stream << "\nbuffers = JMBufferSet(Server.default);\n";
-			stream << "if(buffers.load(thisProcess.nowExecutingPath.dirname +/+ \"%\").not) { Error(\"Buffer loading failed\").throw };\n".format(path.basename);
+			stream << "if(buffers.load(thisProcess.nowExecutingPath).not) { Error(\"Buffer loading failed\").throw };\n";
 			stream << "Server.default.sync;\n\n";
 		} {
 			Error("JMBufferSet directory doesn't exist; storeOn can't proceed").throw;
