@@ -21,7 +21,7 @@ JITModPatch {
 		// .load boots the server automatically; .new doesn't
 		if(server.serverRunning.not) { server.boot };
 		proxyspace = StereoProxySpace(server, name);
-		buffers = JITModBufferSet(this);
+		buffers = JMBufferSet(this);
 		this.initDoc;
 		this.initController;
 		if(gui.isNil or: { gui.object !== proxyspace }) {
@@ -35,7 +35,7 @@ JITModPatch {
 	initFromArchive { |archive|
 		name = archive[\name];
 		proxyspace = archive[\proxyspace];
-		buffers = archive[\buffers] ?? { JITModBufferSet(this) };
+		buffers = archive[\buffers] ?? { JMBufferSet(this) };
 		midi = archive[\midi];
 		this.initDoc(archive[\string]);
 		this.initController;
@@ -209,9 +209,9 @@ JITModPatch {
 	// midi
 	initMidi { |device, name, channel|
 		if(device.notNil) {
-			midi = JITModMIDI.newByName(proxyspace, device, name, channel);
+			midi = JMMIDI.newByName(proxyspace, device, name, channel);
 		} {
-			midi = JITModMIDI(proxyspace, channel);
+			midi = JMMIDI(proxyspace, channel);
 		};
 		this.dirty = true;
 	}
@@ -316,7 +316,7 @@ JITModPatchGui {
 	}
 }
 
-JITModBufferSet {
+JMBufferSet {
 	var <>model, <server, <buffers, <path;
 	// path should be the full path of the .jitmod file -- set in 'save'
 
@@ -413,11 +413,11 @@ JITModBufferSet {
 		if(path.notNil) { dir = this.dir(path) };
 		if(dir.notNil and: { File.exists(dir) and: { File.type(dir) == \directory } }) {
 			// for loading, always relative path
-			stream << "\nbuffers = JITModBufferSet(Server.default);\n";
+			stream << "\nbuffers = JMBufferSet(Server.default);\n";
 			stream << "if(buffers.load(thisProcess.nowExecutingPath.dirname +/+ \"%\").not) { Error(\"Buffer loading failed\").throw };\n".format(path.basename);
 			stream << "Server.default.sync;\n\n";
 		} {
-			Error("JITModBufferSet directory doesn't exist; storeOn can't proceed").throw;
+			Error("JMBufferSet directory doesn't exist; storeOn can't proceed").throw;
 		};
 	}
 
@@ -430,11 +430,11 @@ JITModBufferSet {
 	}
 
 	asRef { |name|
-		^JITModBufferRef(name, buffers[name])
+		^JMBufferRef(name, buffers[name])
 	}
 }
 
-JITModBufferRef {
+JMBufferRef {
 	var <name, <buffer;
 	*new { |name, buffer|
 		^super.newCopyArgs(name, buffer)
@@ -444,7 +444,7 @@ JITModBufferRef {
 		stream << "buffers.asRef(" <<< name << ")"
 	}
 	printOn { |stream|
-		stream << "JITModBufferRef(" <<< name << ", " << buffer << ")"
+		stream << "JMBufferRef(" <<< name << ", " << buffer << ")"
 	}
 	bufnum { ^buffer.bufnum }
 	numFrames { ^buffer.numFrames }
