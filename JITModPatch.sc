@@ -462,3 +462,20 @@ JMBufferRef {
 
 	proxyControlClass { ^StreamControl }
 }
+
+// intended as a more readable syntax for audio input sockets
+// old: ~out = { \in.ar(0!2) };
+// new: ~out = { JMInput.ar };
+JMInput {
+	*ar { |name = \in, numChannels = 2|
+		^NamedControl.ar(name, Array.fill(numChannels, 0))
+	}
+
+	*kr { |name, numChannels = 1, default = 0|
+		if(name.notNil) {
+			^NamedControl.kr(name, default.asArray.wrapExtend(numChannels))
+		} {
+			Error("JMInput.kr: Must specify a name").throw;
+		}
+	}
+}
