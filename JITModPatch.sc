@@ -258,7 +258,7 @@ JITModPatch {
 		^buf
 	}
 
-	addBuf { |name, buffer, replace = false|
+	addBuf { |name, buffer, replace = true|
 		buffers.put(name, buffer, replace);
 	}
 
@@ -347,7 +347,7 @@ JMBufferSet {
 
 	at { |name| ^buffers[name.asSymbol] }
 
-	put { |name, buffer, replace(false)|
+	put { |name, buffer, replace(true)|
 		var old;
 		name = name.asSymbol;
 		if(buffer.isNil) { ^this.removeAt(name) };
