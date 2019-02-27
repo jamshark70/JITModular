@@ -243,19 +243,61 @@ JITModPatch {
 
 	// buffers
 	readBuf { |name, path, startFrame = 0, numFrames = -1, action|
-		var buf = Buffer.read(proxyspace.server, path, startFrame, numFrames, action);
-		buffers.put(name, buf);
+		var buf = Buffer(proxyspace.server),
+		finish = this.prFinishBufAction(name, buf);
+		buf.doOnInfo = {
+			finish.value(true);
+			try { action.value } { |err|
+				err.reportError;
+				"^^^ Error during readBuf action".warn;
+			};
+		};
+		buf.allocRead(path, startFrame, numFrames, { |buf| ["/b_query", buf.bufnum] });
 		^buf
 	}
 
 	readBufChannel { |name, path, startFrame = 0, numFrames = -1, channels, action|
-		var buf;
+		var buf, finish;
 		if(channels.isNil) {
 			Error("JITModPatch:readBufChannel: Please supply a 'channels' array").throw;
 		};
-		buf = Buffer.readChannel(proxyspace.server, path, startFrame, numFrames, channels, action);
-		buffers.put(name, buf);
+		buf = Buffer(proxyspace.server);
+		finish = this.prFinishBufAction(name, buf);
+		buf.doOnInfo = {
+			finish.value(true);
+			try { action.value } { |err|
+				err.reportError;
+				"^^^ Error during readBuf action".warn;
+			};
+		};
+		buf.allocReadChannel(path, startFrame, numFrames, channels, { |buf| ["/b_query", buf.bufnum] });
 		^buf
+	}
+
+	prFinishBufAction { |name, buf|
+		var status,
+		failResp = OSCFunc({ |msg|
+			if(msg[3] == buf.bufnum) {
+				finish.(false);
+			};
+		}, '/fail', buf.server.addr),
+		finish = { |success|
+			success.debug("readBuf finish");
+			failResp.free;
+			if(success) {
+				buffers.put(name, buf);  // 'buffers' sends \addBuffer
+			} {
+				buf.free;  // reuse bufnum
+				buffers.changed(\bufReadFailed, name, buf);
+			};
+			status = success;
+		};
+		// schedule timeout
+		AppClock.sched(3, {
+			if(status.isNil) { finish.(false) };
+			// if status is notNil, then we already did finish (true or false)
+		});
+		^finish
 	}
 
 	addBuf { |name, buffer, replace = true|

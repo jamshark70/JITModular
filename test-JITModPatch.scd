@@ -130,3 +130,19 @@ p.clear;
 
 
 Pattern.findRespondingMethodFor(\makeProxyControl)
+
+
+
+// buffer read failure
+p = JITModPatch.new;
+
+p.readBuf(\fail1, Platform.resourceDir +/+ "sounds/nope.wav");
+p.buffers.buffers
+s.bufferAllocator.debug
+
+p.readBuf(\a11, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
+
+// try to replace with failed
+p.readBuf(\a11, Platform.resourceDir +/+ "sounds/nope.wav");
+
+p.clear;
