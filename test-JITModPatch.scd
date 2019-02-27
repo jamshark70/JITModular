@@ -1,3 +1,10 @@
+p = JITModPatch.new;
+p.save;
+p.clear;
+
+p = JITModPatch.load;
+p.clear;
+
 p = JITModPatch.load;
 
 s.boot;
