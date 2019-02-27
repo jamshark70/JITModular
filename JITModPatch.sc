@@ -515,7 +515,13 @@ JMInput {
 
 	*kr { |name, numChannels = 1, default = 0|
 		if(name.notNil) {
-			^NamedControl.kr(name, default.asArray.wrapExtend(numChannels))
+			default = default.asArray;
+			if(default.size > numChannels) {
+				"JMInput.kr: Default has too many channels, % channels discarded"
+				.format(default.size - numChannels)
+				.warn;
+			};
+			^NamedControl.kr(name, default.wrapExtend(numChannels))
 		} {
 			Error("JMInput.kr: Must specify a name").throw;
 		}
