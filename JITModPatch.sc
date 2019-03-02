@@ -24,11 +24,7 @@ JITModPatch {
 		buffers = JMBufferSet(this);
 		this.initDoc;
 		this.initController;
-		if(gui.isNil or: { gui.object !== proxyspace }) {
-			gui.tryPerform(\close);
-			proxyspace.use { gui = proxyspace.gui };
-		};
-		// JITModPatchGui(this);  // uses dependencies
+		JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;
 	}
 
@@ -40,16 +36,14 @@ JITModPatch {
 		this.initDoc(archive[\string]);
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
-		if(gui.isNil or: { gui.object !== proxyspace }) {
-			gui.tryPerform(\close);
-			proxyspace.use { gui = proxyspace.gui };
-		};
-		// JITModPatchGui(this);  // uses dependencies
+		JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;
 	}
 
 	initDoc { |string("")|
 		doc = Document.new("JITModPatch: " ++ name, string, envir: proxyspace);
+		// seems we need a little time for string/envir to sync up
+		AppClock.sched(0.5, { doc.front });
 	}
 
 	initController {
@@ -93,7 +87,7 @@ JITModPatch {
 		buffers.clear;
 		midi.free;
 		doc.close;
-		gui.close; gui = nil;
+		// gui.close; gui = nil;
 		this.changed(\didFree);
 	}
 
@@ -311,18 +305,23 @@ JITModPatch {
 
 JITModPatchGui {
 	var <model,
-	<view,
-	saveButton, saveAsButton, loadButton,
+	<view, window,
+	psGuiView, psGui,
+	saveButton, saveAsButton, loadButton, clearButton,
 	controllers;
 
 	*new { |model, parent, bounds|
-		var view;
+		var view, iMadeWindow = false;
 		if(parent.isNil) {
-			parent = Window("JITModPatch: %".format(model.name), Rect(800, 200, 500, 400)).front;
+			// ProxyMixer may be up to 1086 wide
+			parent = Window("JITModPatch: %".format(model.name), Rect(100, 200, 1200, 500))
+			.userCanClose_(false)
+			.front;
+			iMadeWindow = true;
 			if(bounds.isNil) { bounds = parent.view.bounds.insetBy(5, 5) };
 		};
 		view = View(parent, bounds);
-		^super.newCopyArgs(model).init(view)
+		^super.newCopyArgs(model).init(view, if(iMadeWindow) { parent } { nil })
 	}
 
 	*newForLayout { |model|
@@ -330,13 +329,23 @@ JITModPatchGui {
 		^super.newCopyArgs(model).init(view)
 	}
 
-	init { |argView|
+	init { |argView, argWindow|
+		var saveWin;
 		view = argView;
+		window = argWindow;
 		view.layout = VLayout(
-			saveButton = Button(),
-			saveAsButton = Button(),
-			loadButton = Button()
+			HLayout(
+				saveButton = Button(),
+				saveAsButton = Button(),
+				loadButton = Button(),
+				clearButton = Button()
+			),
+			psGuiView = View()
 		);
+		model.proxyspace.use {
+			// must be in the right environment
+			psGui = ProxyMixer(model.proxyspace, 12, psGuiView, Rect(0, 0, 1090, 275));
+		};
 		saveButton.states_([["save"]])
 		.action_({ model.save(model.path) });  // model.path may be nil; gives file dialog
 		saveAsButton.states_([["save as"]])
@@ -346,15 +355,80 @@ JITModPatchGui {
 			FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
 				path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		});
+		clearButton.states_([["quit"]])
+		.action_({
+			if(model.dirty) {
+				saveWin = Window("save?", Rect.aboutPoint(Window.screenBounds.center, 100, 60));
+				saveWin.layout = VLayout(
+					StaticText().align_(\center).string_("You have unsaved changes."),
+					HLayout(
+						nil,
+						Button().states_([["save"]])
+						.action_({
+							saveWin.close;
+							this.prSave(model.path, { model.clear });
+						}),
+						Button().states_([["save as"]])
+						.action_({
+							saveWin.close;
+							this.prSave(model.path, { model.clear });
+						}),
+Button().states_([["discard"]])
+						.action_({ saveWin.close; model.clear }),
+						Button().states_([["cancel"]])
+						.action_({ saveWin.close })
+					)
+				);
+				saveWin.front;
+			} {
+				model.clear;
+			}
+		});
 		controllers = IdentityDictionary.new;
 		controllers[\patch] = SimpleController(model)
 		.put(\dirty, { |obj, what, bool|
 			defer { saveButton.enabled = bool };
 		})
 		.put(\didFree, {
-			// this.close;
+			this.close;
 			controllers.do(_.remove);
 		});
+	}
+
+	// calls up to the model to save, and finishes with an action at the end
+	prSave { |path, action|
+		controllers[\patch].put(\save, { |obj, what, code, error|
+			controllers[\patch].removeAt(\save);
+			switch(code)
+			{ \success } {
+				action.value;
+			}
+			{ \openFailed } {
+				this.errorWindow("File open failed", "Could not open the file");
+			}
+			{ \error } {
+				this.errorWindow("Error during save", error.errorString)
+			}
+			{ this.errorWindow("Oops", "Unexpected save status") }
+		});
+		model.save(path);
+	}
+
+	errorWindow { |title, msg|
+		var errWin;
+		errWin = Window(title, Rect.aboutPoint(Window.screenBounds.center, 100, 60));
+		errWin.layout = VLayout(
+			StaticText().align_(\center).string_(msg),
+			HLayout(
+				nil,
+				Button().states_([["OK"]]).action_({ errWin.close })
+			)
+		);
+		errWin.front;
+	}
+
+	close {
+		if(window.notNil) { window.close };
 	}
 }
 
