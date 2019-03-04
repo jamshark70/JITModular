@@ -295,7 +295,6 @@ JITModPatch {
 			};
 		}, '/fail', buf.server.addr),
 		finish = { |success|
-			success.debug("readBuf finish");
 			failResp.free;
 			if(success) {
 				buffers.put(name, buf);  // 'buffers' sends \addBuffer
