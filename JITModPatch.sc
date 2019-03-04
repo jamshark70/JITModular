@@ -412,11 +412,12 @@ Button().states_([["discard"]])
 			defer { saveButton.enabled = bool };
 		})
 		// fill in later for connection view
-		// .put(\set, { |... args|  })
+		.put(\set, { |args| this.updateConn(args) })
 		.put(\didFree, {
 			this.close;
 			controllers.do(_.remove);
 		});
+		this.updateConn;
 	}
 
 	// calls up to the model to save, and finishes with an action at the end
@@ -453,6 +454,87 @@ Button().states_([["discard"]])
 
 	close {
 		if(window.notNil) { window.close };
+	}
+
+	updateConn {
+		// This is not modularized at all because I'm lazy
+		var chains = Array.new, out = CollStream.new,
+		makeConn = { |src, target, name|
+			(src: src, target: target, name: name)
+		},
+		findChain = { |conn|
+			chains.detect { |chain|
+				[chain.first.src.key, conn.target.key].debug("checking chain head");
+				chain.first.src === conn.target
+				or: {
+					[chain.last.target.key, conn.src.key].debug("checking chain tail");
+					chain.last.target === conn.src
+				}
+			};
+		},
+		// problem: cleaning 'c' array (we are iterating over it)
+		scanLinks = {
+			(1 .. chains.size - 1).do { |i|  // 1, 2, 3...
+				if(chains[i].notNil) {
+					block { |break|
+						i.do { |j|  // 0, 1 .. i-1
+							if(chains[j].notNil) {
+								if(chains[i].first.src == chains[j].last.target) {
+									// c[i] goes to end of c[j]
+									chains[i].do { |conn| chains[j].add(conn) };
+									chains[i] = nil;
+									break.();
+								} {
+									if(chains[i].last.target == chains[j].first.src) {
+										// c[i] goes to head of c[j]
+										chains[i].reverseDo { |conn| chains[j].addFirst(conn) };
+										chains[i] = nil;
+										break.();
+									}
+								};
+							};
+						};
+					};
+				};
+			};
+			chains = chains.reject(_.isNil);
+		};
+		model.proxyspace.keysValuesDo { |key, proxy|
+			var conn, chain;
+			proxy.key.debug("\n\nscanning");
+			proxy.nodeMap.debug("nodemap").keysValuesDo { |key, src|
+				if(src.debug("nodemap value").isKindOf(BusPlug)) {
+					conn = makeConn.(src, proxy, key).debug("connection");
+					[conn.src, conn.target].debug("checking connection access");
+					chain = findChain.(conn).debug("chain");
+					if(chain.notNil) {
+						[conn.src.key, chain.last.target.key].debug("new connection src, chain tail target");
+						if(conn.src == chain.last.target) {
+							chain.add(conn).debug("added to tail");
+						} {
+							chain.addFirst(conn).debug("added to head");
+						};
+						scanLinks.();
+					} {
+						chains = chains.add(LinkedList.new.addFirst(conn).debug("added new chain"));
+					};
+				};
+			};
+		};
+		model.proxyspace.use {
+			chains.do { |chain|
+				out << chain.first.src.asCompileString;
+				chain.do { |conn, i|
+					out << " <>>";
+					if(conn.name != \in) {
+						out << "." << conn.name;
+					};
+					out << " " << conn.target.asCompileString;
+				};
+				out << "\n";
+			};
+		};
+		defer { connView.string = out.collection };
 	}
 }
 
