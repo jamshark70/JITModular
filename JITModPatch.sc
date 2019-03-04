@@ -49,10 +49,29 @@ JITModPatch {
 	initController {
 		var makeCtl = { |proxy|
 			// we might not be in the environment at this point
-			var key = proxyspace.use { proxy.key };
+			var key = proxyspace.use { proxy.key },
+			setFunc = { |obj, what, args|
+				var pairs = Array(args.size);
+				args.pairsDo { |key, value|
+					if(value.isKindOf(BusPlug)) {
+						pairs.add(key).add(value);
+					};
+				};
+				if(pairs.size > 0) {
+					// send only mappings, not setting fixed values
+					this.changed(\set, args)
+				};
+			};
 			controllers[key] = SimpleController(proxy)
 			.put(\source, { this.dirty = true })
+			.put(\set, setFunc)
+			.put(\map, setFunc);
 			// .put(\clear, { ... remove ctl? ... })
+			// per NodeProxy:xfadePerform, it appears that the \map or \set notification
+			// may come from either the nodeproxy or the nodemap...???
+			controllers[(key ++ "_nodeMap").asSymbol] = SimpleController(proxy.nodeMap)
+			.put(\set, setFunc)
+			.put(\map, setFunc);
 		};
 		if(controllers.isNil) {
 			controllers = IdentityDictionary.new
@@ -308,13 +327,14 @@ JITModPatchGui {
 	<view, window,
 	psGuiView, psGui,
 	saveButton, saveAsButton, loadButton, clearButton,
+	connView,
 	controllers;
 
 	*new { |model, parent, bounds|
 		var view, iMadeWindow = false;
 		if(parent.isNil) {
 			// ProxyMixer may be up to 1086 wide
-			parent = Window("JITModPatch: %".format(model.name), Rect(100, 200, 1200, 500))
+			parent = Window("JITModPatch: %".format(model.name), Rect(100, 200, 1120, 600))
 			.userCanClose_(false)
 			.front;
 			iMadeWindow = true;
@@ -340,7 +360,10 @@ JITModPatchGui {
 				loadButton = Button(),
 				clearButton = Button()
 			),
-			psGuiView = View()
+			HLayout(
+				connView = TextView().editable_(false)
+			),
+			psGuiView = View().fixedHeight_(295)
 		);
 		model.proxyspace.use {
 			// must be in the right environment
@@ -389,6 +412,8 @@ Button().states_([["discard"]])
 		.put(\dirty, { |obj, what, bool|
 			defer { saveButton.enabled = bool };
 		})
+		// fill in later for connection view
+		// .put(\set, { |... args|  })
 		.put(\didFree, {
 			this.close;
 			controllers.do(_.remove);
