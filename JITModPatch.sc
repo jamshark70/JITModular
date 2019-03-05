@@ -460,15 +460,19 @@ Button().states_([["discard"]])
 		// This is not modularized at all because I'm lazy
 		var chains = Array.new, out = CollStream.new,
 		makeConn = { |src, target, name|
-			(src: src, target: target, name: name)
+			(src: src, target: target, name: name, srcRate: src.rate)
+		},
+		canConnect = { |a, b|
+			// [a.srcRate, b.srcRate, a.target === b.src].debug("canConnect: rates, target --> src");
+			a.srcRate == b.srcRate and: { a.target === b.src }
 		},
 		findChain = { |conn|
 			chains.detect { |chain|
 				[chain.first.src.key, conn.target.key].debug("checking chain head");
-				chain.first.src === conn.target
+				canConnect.(conn, chain.first) // chain.first.src === conn.target
 				or: {
 					[chain.last.target.key, conn.src.key].debug("checking chain tail");
-					chain.last.target === conn.src
+					canConnect.(chain.last, conn) // chain.last.target === conn.src
 				}
 			};
 		},
@@ -479,13 +483,13 @@ Button().states_([["discard"]])
 					block { |break|
 						i.do { |j|  // 0, 1 .. i-1
 							if(chains[j].notNil) {
-								if(chains[i].first.src == chains[j].last.target) {
+								if(canConnect.(chains[j].last, chains[i].first) /*chains[i].first.src == chains[j].last.target*/) {
 									// c[i] goes to end of c[j]
 									chains[i].do { |conn| chains[j].add(conn) };
 									chains[i] = nil;
 									break.();
 								} {
-									if(chains[i].last.target == chains[j].first.src) {
+									if(canConnect.(chains[i].last, chains[j].first) /*chains[i].last.target == chains[j].first.src*/) {
 										// c[i] goes to head of c[j]
 										chains[i].reverseDo { |conn| chains[j].addFirst(conn) };
 										chains[i] = nil;
@@ -509,7 +513,7 @@ Button().states_([["discard"]])
 					chain = findChain.(conn).debug("chain");
 					if(chain.notNil) {
 						[conn.src.key, chain.last.target.key].debug("new connection src, chain tail target");
-						if(conn.src == chain.last.target) {
+						if(canConnect.(chain.last, conn) /*conn.src == chain.last.target*/) {
 							chain.add(conn).debug("added to tail");
 						} {
 							chain.addFirst(conn).debug("added to head");
