@@ -42,3 +42,16 @@
 	makeStereoProxyControl { ^this.deepCopy } //already wrapped, but needs to be copied
 }
 
++ ProxyNodeMap {
+	// work around a bug where asControlInput shouldn't be called
+		controlNames {
+		var res = Array.new;
+		this.keysValuesDo { |key, value|
+			var rate;
+			// value = value.asControlInput;
+			rate = if(value.rate == \audio) { \audio } { \control };
+			res = res.add(ControlName(key, nil, rate, value))
+		};
+		^res
+	}
+}
