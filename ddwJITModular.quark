@@ -1,6 +1,11 @@
 (
-	name:		"ddwJITModular",
-	path:		"ddwJITModular",
+// note, I would really like to call this ddwJITModular
+// but the folder is already called JITModular
+// for some reason, quarks ignores whatever you put here
+// and just uses the folder name.
+// So why do we have to fill in the name here?
+	name:		"JITModular",
+	path:		"JITModular",
 	summary:	"Tools to help use a JITLib ProxySpace as a monophonic modular synth",
 	author:		"James Harkins",
 	version:	0.1,
