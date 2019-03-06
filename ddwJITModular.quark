@@ -1,0 +1,10 @@
+(
+	name:		"ddwJITModular",
+	path:		"ddwJITModular",
+	summary:	"Tools to help use a JITLib ProxySpace as a monophonic modular synth",
+	author:		"James Harkins",
+	version:	0.1,
+//	helpdoc:	"",
+	url:		"http://www.dewdrop-world.net/sc3",
+	dependencies:	#["JITLibExtensions"]
+)
