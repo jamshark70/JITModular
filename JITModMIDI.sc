@@ -117,6 +117,7 @@ JMMIDI {
 				(type: \psSet, proxyspace: proxyspace, skipArgs: skip)
 				.put(name, spec.map(val / 127.0))
 				.play;
+				this.changed(\cc, num, val);
 			}, num, chan: channel, srcID: uid)
 		));
 		this.changed(\addCtl, num, name, spec);
@@ -141,5 +142,93 @@ JMMIDI {
 			};
 		};
 		stream << "}.value";
+	}
+}
+
+JMMidiView : SCViewHolder {
+	var model, layout,
+	controllers,
+	ccs;
+	*new { |model|
+		^super.new.init(model)
+	}
+
+	// http://sccode.org/1-50N: Stretchable ScrollView
+	init { |argModel|
+		model = argModel;
+		ccs = MultiLevelIdentityDictionary.new;  // num --> name --> view
+		this.view = ScrollView();  // assumes in a layout
+		view.canvas = View();
+		view.canvas.layout = layout = VLayout(
+			StaticText().string_("MIDI Controllers").fixedHeight_(30),
+			View()  // dummy spacer
+		);
+		controllers = IdentityDictionary.new;
+		controllers[\model] = SimpleController(model)
+		.put(\initedMidi, { |obj, what, midi|
+			this.initMidi(midi);
+		});
+		if(model.midi.notNil) {
+			this.initMidi(model.midi);
+		};
+	}
+
+	initMidi { |midi|
+		controllers[\midi] = SimpleController(midi)
+		.put(\didFree, { this.remove; controllers.do(_.remove) })
+		.put(\addCtl, { |obj, what, num, name, spec|
+			this.addCtl(num, name, spec);
+		})
+		.put(\removeCtl, { |obj, what, num, name|
+			this.removeCtl(num, name);
+		})
+		.put(\cc, { |obj, what, num, val|
+			this.cc(num, val);
+		});
+	}
+
+	addCtl { |num, name, spec|
+		var new = JITMidiCtlView(num, name, spec);
+		ccs.put(num, name, new);
+		layout.insert(new.view, view.children.size - 1);
+	}
+
+	removeCtl { |num, name|
+		ccs.at(num, name).remove;  // drop from GUI
+		ccs.removeEmptyAt(num, name);  // drom from storage
+	}
+
+	cc { |num, val|
+		ccs.at(num).do { |v| v.cc(val) }
+	}
+}
+
+JITMidiCtlView : SCViewHolder {
+	var nameView, numView, valView, slider, spec;
+	*new { |num, name, spec|
+		^super.new.init(num, name, spec)
+	}
+
+	init { |num, name, argSpec|
+		spec = argSpec;
+		view = View().fixedHeight_(30)
+		.background_(Color.gray(0.6))  // debugging
+		;
+		view.layout = HLayout(
+			nameView = StaticText().string_(name).fixedWidth_(120),
+			numView = StaticText().string_("CC" ++ num).fixedWidth_(50),
+			valView = NumberBox().enabled_(false).fixedWidth_(70),
+			slider = Slider().orientation_(\horizontal)
+		).margins_(2);
+		// actions?
+	}
+
+	cc { |val|
+		var norm = val / 127.0,
+		value = spec.map(norm);
+		defer {
+			valView.value = value;
+			slider.value = norm;
+		}
 	}
 }

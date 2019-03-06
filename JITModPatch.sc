@@ -226,6 +226,7 @@ JITModPatch {
 		} {
 			midi = JMMIDI(proxyspace, channel);
 		};
+		this.changed(\initedMidi, midi);
 		this.dirty = true;
 	}
 	initMidiCtl {
@@ -326,6 +327,8 @@ JITModPatchGui {
 	<view, window,
 	psGuiView, psGui,
 	saveButton, saveAsButton, loadButton, clearButton,
+	// bufferView,  // not yet
+	midiView,
 	connView,
 	controllers;
 
@@ -360,6 +363,8 @@ JITModPatchGui {
 				clearButton = Button()
 			),
 			HLayout(
+				// bufferView = JMBufferView(),  // not yet - put in StackLayout maybe?
+				midiView = JMMidiView(model),
 				connView = TextView().editable_(false)
 			),
 			psGuiView = View().fixedHeight_(295)
