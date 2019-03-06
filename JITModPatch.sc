@@ -7,6 +7,12 @@ JITModPatch {
 
 	var controllers;  // track changes in proxyspace
 
+	*initClass {
+		Class.initClassTree(Event);
+		Class.initClassTree(AbstractPlayControl);
+		(this.filenameSymbol.asString.dirname +/+ "psSet-event-type.scd").load;
+	}
+
 	*new { |server, name|
 		^super.new.init(server, name)
 	}
