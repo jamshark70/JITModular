@@ -82,6 +82,16 @@ JMMIDI {
 		this.changed(\noteOff, num, notes.last);
 	}
 
+	cc { |key, val|
+		var spec = midiFuncs[key];
+		if(spec.notNil) {
+			(type: \psSet, proxyspace: proxyspace, skipArgs: spec[\skipArgs])
+			.put(spec[\name], spec[\spec].map(val / 127.0))
+			.play;
+			this.changed(\cc, spec[\num], val);
+		}
+	}
+
 	learnCtl { |name, spec|
 		var learnFunc;
 		learnFunc = MIDIFunc.cc({ |val, num|
@@ -112,12 +122,9 @@ JMMIDI {
 		};
 		spec = spec.asSpec;
 		midiFuncs.put(key, (
-			name: name, num: num, spec: spec,
+			name: name, num: num, spec: spec, skipArgs: skip,
 			resp: MIDIFunc.cc({ |val, num|
-				(type: \psSet, proxyspace: proxyspace, skipArgs: skip)
-				.put(name, spec.map(val / 127.0))
-				.play;
-				this.changed(\cc, num, val);
+				this.cc(key, val);
 			}, num, chan: channel, srcID: uid)
 		));
 		this.changed(\addCtl, num, name, spec);
@@ -146,7 +153,7 @@ JMMIDI {
 }
 
 JMMidiView : SCViewHolder {
-	var model, layout,
+	var <model, <midi, layout,
 	controllers,
 	ccs;
 	*new { |model|
@@ -173,7 +180,8 @@ JMMidiView : SCViewHolder {
 		};
 	}
 
-	initMidi { |midi|
+	initMidi { |argMidi|
+		midi = argMidi;
 		controllers[\midi] = SimpleController(midi)
 		.put(\didFree, { this.remove; controllers.do(_.remove) })
 		.put(\addCtl, { |obj, what, num, name, spec|
@@ -188,7 +196,7 @@ JMMidiView : SCViewHolder {
 	}
 
 	addCtl { |num, name, spec|
-		var new = JITMidiCtlView(num, name, spec);
+		var new = JITMidiCtlView(this, num, name, spec);
 		ccs.put(num, name, new);
 		layout.insert(new.view, view.children.size - 1);
 	}
@@ -204,13 +212,16 @@ JMMidiView : SCViewHolder {
 }
 
 JITMidiCtlView : SCViewHolder {
-	var nameView, numView, valView, slider, spec;
-	*new { |num, name, spec|
-		^super.new.init(num, name, spec)
+	var <model, key, num, spec, nameView, numView, valView, slider;
+	*new { |model, num, name, spec|
+		^super.new.init(model, num, name, spec)
 	}
 
-	init { |num, name, argSpec|
+	init { |argModel, argNum, name, argSpec|
+		model = argModel;
+		num = argNum;
 		spec = argSpec;
+		key = (name ++ num).asSymbol;
 		view = View().fixedHeight_(30)
 		.background_(Color.gray(0.6))  // debugging
 		;
@@ -220,7 +231,11 @@ JITMidiCtlView : SCViewHolder {
 			valView = NumberBox().enabled_(false).fixedWidth_(70),
 			slider = Slider().orientation_(\horizontal)
 		).margins_(2);
-		// actions?
+		slider.action = { |view|
+			// model is the JMMidiView
+			// model.midi is the JMMIDI object
+			model.midi.cc(key, view.value * 127.0);
+		};
 	}
 
 	cc { |val|
