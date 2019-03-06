@@ -85,6 +85,7 @@ JMMIDI {
 	cc { |key, val|
 		var spec = midiFuncs[key];
 		if(spec.notNil) {
+			spec.put(\val, val);
 			(type: \psSet, proxyspace: proxyspace, skipArgs: spec[\skipArgs])
 			.put(spec[\name], spec[\spec].map(val / 127.0))
 			.play;
@@ -102,7 +103,7 @@ JMMIDI {
 	}
 
 	addCtl { |num, name, spec|
-		var key = (name ++ num).asSymbol,
+		var key = this.key(num, name),
 		skip = [\freq, \amp, \pan, \gt, \t_trig],
 		ctl;
 		skip.remove(name);
@@ -131,11 +132,24 @@ JMMIDI {
 	}
 
 	removeCtl { |num, name|
-		var key = (name ++ num).asSymbol;
+		var key = this.key(num, name);
 		midiFuncs[key][\resp].free;
 		midiFuncs[key] = nil;
 		this.changed(\removeCtl, num, name);
 	}
+
+	editCtl { |num, name, spec|
+		var key = this.key(num, name),
+		func = midiFuncs[key];
+		if(func.notNil) {
+			spec = spec.asSpec;
+			func[\spec] = spec;
+			this.changed(\editCtl, key, spec);
+			// this.cc(key, func[\val]);  // no, this shouldn't change the real value
+		};
+	}
+
+	key { |num, name| ^(name ++ num).asSymbol }
 
 	storeOn { |stream|
 		stream << "{ |proxyspace|\n\tvar new = "
@@ -190,6 +204,17 @@ JMMidiView : SCViewHolder {
 		.put(\removeCtl, { |obj, what, num, name|
 			this.removeCtl(num, name);
 		})
+		.put(\editCtl, { |obj, what, key, spec|
+			var cc = block { |break|
+				ccs.leafDo { |path, ctlView|
+					if(ctlView.key == key) { break.(ctlView) };
+				};
+				nil
+			};
+			if(cc.notNil) {
+				cc.spec = spec;
+			};
+		})
 		.put(\cc, { |obj, what, num, val|
 			this.cc(num, val);
 		});
@@ -212,20 +237,25 @@ JMMidiView : SCViewHolder {
 }
 
 JMMidiCtlView : SCViewHolder {
-	var <model, key, num, spec, nameView, numView, valView, slider;
+	var <model, <key, <num, <name, <spec,
+	deleteButton, nameView, numView, valView, slider;
+
 	*new { |model, num, name, spec|
 		^super.new.init(model, num, name, spec)
 	}
 
-	init { |argModel, argNum, name, argSpec|
+	init { |argModel, argNum, argName, argSpec|
 		model = argModel;
 		num = argNum;
+		name = argName;
 		spec = argSpec;
-		key = (name ++ num).asSymbol;
+		key = model.midi.key(num, name);
 		view = View().fixedHeight_(30)
 		.background_(Color.gray(0.6))  // debugging
 		;
 		view.layout = HLayout(
+			deleteButton = Button().states_([["X", Color.white, Color.red(0.4)]])
+			.fixedSize_(Size(20, 20)),
 			nameView = StaticText().string_(name).fixedWidth_(120),
 			numView = StaticText().string_("CC" ++ num).fixedWidth_(50),
 			valView = NumberBox().enabled_(false).fixedWidth_(70),
@@ -236,6 +266,9 @@ JMMidiCtlView : SCViewHolder {
 			// model.midi is the JMMIDI object
 			model.midi.cc(key, view.value * 127.0);
 		};
+		deleteButton.action = {
+			model.midi.removeCtl(num, name);
+		};
 	}
 
 	cc { |val|
@@ -245,5 +278,14 @@ JMMidiCtlView : SCViewHolder {
 			valView.value = value;
 			slider.value = norm;
 		}
+	}
+
+	spec_ { |argSpec|
+		var oldSpec = spec;
+		spec = argSpec;
+		// maybe can't access slider from this thread
+		defer {
+			slider.value = argSpec.unmap(oldSpec.map(slider.value));
+		};
 	}
 }
