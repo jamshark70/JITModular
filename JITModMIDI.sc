@@ -196,7 +196,7 @@ JMMidiView : SCViewHolder {
 	}
 
 	addCtl { |num, name, spec|
-		var new = JITMidiCtlView(this, num, name, spec);
+		var new = JMMidiCtlView(this, num, name, spec);
 		ccs.put(num, name, new);
 		layout.insert(new.view, view.children.size - 1);
 	}
@@ -211,7 +211,7 @@ JMMidiView : SCViewHolder {
 	}
 }
 
-JITMidiCtlView : SCViewHolder {
+JMMidiCtlView : SCViewHolder {
 	var <model, key, num, spec, nameView, numView, valView, slider;
 	*new { |model, num, name, spec|
 		^super.new.init(model, num, name, spec)
