@@ -1,7 +1,7 @@
 JMMIDI {
 	var <proxyspace;
 	var <channel;
-	var uid, midiFuncs, notes;
+	var uid, <midiFuncs, notes;
 
 	*new { |proxyspace, channel|
 		if(MIDIClient.initialized.not) {
@@ -218,6 +218,12 @@ JMMidiView : SCViewHolder {
 		.put(\cc, { |obj, what, num, val|
 			this.cc(num, val);
 		});
+
+		midi.midiFuncs.keysValuesDo { |key, func|
+			if(#[noteOn, noteOff].includes(key).not) {
+				this.addCtl(func[\num], func[\name], func[\spec]);
+			};
+		};
 	}
 
 	addCtl { |num, name, spec|
