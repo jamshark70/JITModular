@@ -153,3 +153,17 @@ p.readBuf(\a11, Platform.resourceDir +/+ "sounds/a11wlk01.wav");
 p.readBuf(\a11, Platform.resourceDir +/+ "sounds/nope.wav");
 
 p.clear;
+
+
+
+
+
+p = JITModPatch.new;
+
+~out = { \in.ar(0!2) }; ~out.play(vol: 0.2);
+~freq = 200;
+~osc = { VarSaw.ar(~freq.kr, 0, 0.15) };
+~osc <>> ~out;
+p.addCtl(1, \freq, \freq);
+
+p = JITModPatch.load;
