@@ -181,7 +181,10 @@ JMMidiView : SCViewHolder {
 		this.view = ScrollView();  // assumes in a layout
 		view.canvas = View();
 		view.canvas.layout = layout = VLayout(
-			StaticText().string_("MIDI Controllers").fixedHeight_(30),
+			StaticText()
+			.font_(Font.default.size_(18))
+			.string_("MIDI Controllers")
+			.fixedHeight_(30),
 			View()  // dummy spacer
 		);
 		controllers = IdentityDictionary.new;
@@ -256,12 +259,12 @@ JMMidiCtlView : SCViewHolder {
 		name = argName;
 		spec = argSpec;
 		key = model.midi.key(num, name);
-		view = View().fixedHeight_(30)
+		view = View().fixedHeight_(24)
 		.background_(Color.gray(0.6))  // debugging
 		;
 		view.layout = HLayout(
 			deleteButton = Button().states_([["X", Color.white, Color.red(0.4)]])
-			.fixedSize_(Size(20, 20)),
+			.fixedSize_(Size(16, 16)),
 			nameView = StaticText().string_(name).fixedWidth_(120),
 			numView = StaticText().string_("CC" ++ num).fixedWidth_(50),
 			valView = NumberBox().enabled_(false).fixedWidth_(70),
