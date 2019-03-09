@@ -213,7 +213,9 @@ JITModPatch {
 
 	path_ { |p|
 		path = p;
-		Archive.put(\JITModPatch, \lastPath, path);
+		if(path.notNil) {
+			Archive.put(\JITModPatch, \lastPath, path);
+		};
 	}
 
 	dirty_ { |bool|
@@ -474,16 +476,13 @@ Button().states_([["discard"]])
 			(src: src, target: target, name: name, srcRate: src.rate)
 		},
 		canConnect = { |a, b|
-			// [a.srcRate, b.srcRate, a.target === b.src].debug("canConnect: rates, target --> src");
 			a.srcRate == b.srcRate and: { a.target === b.src }
 		},
 		findChain = { |conn|
 			chains.detect { |chain|
-				[chain.first.src.key, conn.target.key].debug("checking chain head");
-				canConnect.(conn, chain.first) // chain.first.src === conn.target
+				canConnect.(conn, chain.first)
 				or: {
-					[chain.last.target.key, conn.src.key].debug("checking chain tail");
-					canConnect.(chain.last, conn) // chain.last.target === conn.src
+					canConnect.(chain.last, conn)
 				}
 			};
 		},
@@ -494,13 +493,13 @@ Button().states_([["discard"]])
 					block { |break|
 						i.do { |j|  // 0, 1 .. i-1
 							if(chains[j].notNil) {
-								if(canConnect.(chains[j].last, chains[i].first) /*chains[i].first.src == chains[j].last.target*/) {
+								if(canConnect.(chains[j].last, chains[i].first)) {
 									// c[i] goes to end of c[j]
 									chains[i].do { |conn| chains[j].add(conn) };
 									chains[i] = nil;
 									break.();
 								} {
-									if(canConnect.(chains[i].last, chains[j].first) /*chains[i].last.target == chains[j].first.src*/) {
+									if(canConnect.(chains[i].last, chains[j].first)) {
 										// c[i] goes to head of c[j]
 										chains[i].reverseDo { |conn| chains[j].addFirst(conn) };
 										chains[i] = nil;
@@ -516,22 +515,19 @@ Button().states_([["discard"]])
 		};
 		model.proxyspace.keysValuesDo { |key, proxy|
 			var conn, chain;
-			proxy.key.debug("\n\nscanning");
-			proxy.nodeMap.debug("nodemap").keysValuesDo { |key, src|
-				if(src.debug("nodemap value").isKindOf(BusPlug)) {
-					conn = makeConn.(src, proxy, key).debug("connection");
-					[conn.src, conn.target].debug("checking connection access");
-					chain = findChain.(conn).debug("chain");
+			proxy.nodeMap.keysValuesDo { |key, src|
+				if(src.isKindOf(BusPlug)) {
+					conn = makeConn.(src, proxy, key);
+					chain = findChain.(conn);
 					if(chain.notNil) {
-						[conn.src.key, chain.last.target.key].debug("new connection src, chain tail target");
-						if(canConnect.(chain.last, conn) /*conn.src == chain.last.target*/) {
-							chain.add(conn).debug("added to tail");
+						if(canConnect.(chain.last, conn)) {
+							chain.add(conn);
 						} {
-							chain.addFirst(conn).debug("added to head");
+							chain.addFirst(conn);
 						};
 						scanLinks.();
 					} {
-						chains = chains.add(LinkedList.new.addFirst(conn).debug("added new chain"));
+						chains = chains.add(LinkedList.new.addFirst(conn));
 					};
 				};
 			};
