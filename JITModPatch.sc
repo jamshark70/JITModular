@@ -43,6 +43,8 @@ JITModPatch {
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
 		JITModPatchGui(this);  // uses dependencies
+		// BUG: proxyspace hasn't finished initting
+		// how to know when it's done? there is no clear pattern in timing
 		this.dirty = false;
 	}
 
@@ -201,6 +203,7 @@ JITModPatch {
 					if(error.notNil) {
 						this.changed(\save, \error, error);
 					} {
+						this.dirty = false;
 						this.changed(\save, \success);
 					}
 				};
