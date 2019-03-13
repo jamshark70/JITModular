@@ -1,6 +1,6 @@
 JITModPatch {
 	var <name;
-	var <>proxyspace, <>buffers, <>midi;
+	var <>proxyspace, <>server, <>buffers, <>midi;
 	var <>doc, gui;
 	var <path;
 	var <dirty = false;  // I'm not sure I can really support this?
@@ -13,25 +13,34 @@ JITModPatch {
 		(this.filenameSymbol.asString.dirname +/+ "psSet-event-type.scd").load;
 	}
 
-	*new { |server, name|
-		^super.new.init(server, name)
+	*new { |server, name, loading = false|
+		^super.new.init(server, name, loading: loading)
 	}
 
 	*newFrom { |archive|
 		^super.new.initFromArchive(archive)
 	}
 
-	init { |server, argName, array|
+	init { |argServer, argName, array, loading = false|
 		name = argName;
+		server = argServer;
 		if(server.isNil) { server = Server.default };
 		// .load boots the server automatically; .new doesn't
+		NotificationCenter.registerOneShot(this, \ready, \init, {
+			"got ready".debug;
+			server.waitForBoot {  // just to be sure
+				proxyspace = StereoProxySpace(server, name);
+				buffers = JMBufferSet(this);
+				this.initDoc;
+				this.initController;
+				JITModPatchGui(this);  // uses dependencies
+				this.dirty = false;
+			};
+		});
 		server.waitForBoot {
-			proxyspace = StereoProxySpace(server, name);
-			buffers = JMBufferSet(this);
-			this.initDoc;
-			this.initController;
-			JITModPatchGui(this);  // uses dependencies
-			this.dirty = false;
+			if(loading.not) {
+				NotificationCenter.notify(this, \ready);
+			};
 		};
 	}
 
@@ -118,18 +127,21 @@ JITModPatch {
 		proxyspace.remove;  // take it out of the global collection, for 'load'
 		buffers.clear;
 		midi.free;
-		doc.close;
+		doc.tryPerform(\close);  // may not have been initialized, if loading
 		// gui.close; gui = nil;
 		this.changed(\didFree);
 	}
 
 	*load { |path|
-		var new = this.new;
+		var new = this.new(loading: true);
 		if(path.notNil) {
 			^new.load(path)
 		};
 		// else (btw, later implement default path)
-		FileDialog({ |path| new.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
+		FileDialog(
+			{ |path| new.load(path) },
+			{ NotificationCenter.notify(new, \ready.debug("canceled, notifying")) },  // finish initing empty patch
+			fileMode: 1, acceptMode: 0, stripResult: true,
 			path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		^new  // you can have it now but it will be ready later
 	}
@@ -137,7 +149,7 @@ JITModPatch {
 	load { |p|
 		var file = File(p, "r"), code, archive, saveExecutingPath;
 		if(file.isOpen) {
-			proxyspace.server.waitForBoot {
+			server.waitForBoot {
 				Library.put(\JITModPatch, \nowLoading, this);
 				protect {
 					this.clear;
@@ -284,7 +296,7 @@ JITModPatch {
 
 	// buffers
 	readBuf { |name, path, startFrame = 0, numFrames = -1, action|
-		var buf = Buffer(proxyspace.server),
+		var buf = Buffer(server),
 		finish = this.prFinishBufAction(name, buf);
 		buf.doOnInfo = {
 			finish.value(true);
@@ -302,7 +314,7 @@ JITModPatch {
 		if(channels.isNil) {
 			Error("JITModPatch:readBufChannel: Please supply a 'channels' array").throw;
 		};
-		buf = Buffer(proxyspace.server);
+		buf = Buffer(server);
 		finish = this.prFinishBufAction(name, buf);
 		buf.doOnInfo = {
 			finish.value(true);
@@ -609,7 +621,7 @@ JMBufferSet {
 			server = model;
 			model = nil;
 		} {
-			server = model.proxyspace.server;
+			server = model.server;
 		};
 		buffers = IdentityDictionary.new;
 		controllers = IdentityDictionary.new;
@@ -786,6 +798,12 @@ JMBuf : Buffer {
 				this.changed(*[\done, msg[1], reallyDone].debug("sending"));
 			}, '/done', server.addr, argTemplate: [nil, bufnum]);
 		};
+	}
+
+	uncache {
+		resp.free;
+		resp = nil;
+		super.uncache;
 	}
 
 	allocMsg { arg completionMessage;
@@ -1065,7 +1083,7 @@ JMBufferView : SCViewHolder {
 				})
 			};
 		} {
-			sfView.setData([0], channels: 1, samplerate: model.proxyspace.server.sampleRate.asInteger);
+			sfView.setData([0], channels: 1, samplerate: model.server.sampleRate.asInteger);
 		};
 	}
 }
