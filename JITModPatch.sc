@@ -49,7 +49,7 @@ JITModPatch {
 	}
 
 	initDoc { |string("")|
-		doc = Document.new("JITModPatch: " ++ name, string, envir: proxyspace);
+		doc = Document.new(this.docTitle, string, envir: proxyspace);
 		// seems we need a little time for string/envir to sync up
 		AppClock.sched(0.5, { doc.front });
 	}
@@ -214,8 +214,11 @@ JITModPatch {
 		}
 	}
 
+	docTitle { ^"JITModPatch: " ++ (name ?? "Untitled") }
+
 	name_ { |n|
 		name = n;
+		doc.title = this.docTitle;
 		this.changed(\name, name);
 	}
 
@@ -353,7 +356,7 @@ JITModPatchGui {
 		var view, iMadeWindow = false;
 		if(parent.isNil) {
 			// ProxyMixer may be up to 1086 wide
-			parent = Window("JITModPatch: %".format(model.name ?? { "Untitled" }), Rect(100, 200, 1120, 600))
+			parent = Window(model.docTitle, Rect(100, 200, 1120, 600))
 			.userCanClose_(false)
 			.front;
 			iMadeWindow = true;
@@ -437,7 +440,7 @@ Button().states_([["discard"]])
 		.put(\name, { |obj, what, name|
 			if(window.notNil) {
 				defer {
-					window.name = "JITModPatch: " ++ (name ?? { "Untitled" });
+					window.name = model.docTitle;
 				};
 			};
 		})
