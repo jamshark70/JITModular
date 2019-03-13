@@ -397,7 +397,7 @@ JITModPatchGui {
 						nil
 					),
 					stack = StackLayout(
-						bufferView = /*JMBuffer*/View(),  // not yet - put in StackLayout maybe?
+						bufferView = JMBufferView(model),
 						midiView = JMMidiView(model),
 					).mode_(\stackOne),
 				), stretch: 1],
@@ -738,6 +738,163 @@ JMBufferRef {
 	}
 
 	proxyControlClass { ^StreamControl }
+}
+
+JMBufferView : SCViewHolder {
+	var model, buffers;
+	var listView, items, sfView, selectionView, controllers;
+	var readButton, replaceButton, deleteButton;
+
+	*new { |model| ^super.new.init(model) }
+
+	init { |argModel|
+		model = argModel;
+		buffers = model.buffers;
+		view = View();
+		view.layout = HLayout(
+			VLayout(
+				listView = ListView(),
+				sfView = SoundFileView(),
+				selectionView = TextField().fixedHeight_(20)
+				.enabled_(false).align_(\center)
+			),
+			VLayout(
+				nil,
+				readButton = Button().fixedWidth_(80),
+				replaceButton = Button().fixedWidth_(80),
+				deleteButton = Button().fixedWidth_(80),
+				nil,
+			)
+		);
+		items = Array.new;
+		this.updateItems.updateSfView;
+		listView.action_({ |view|
+			this.updateSfView(items[view.value][0]);
+		});
+		sfView.action_({ |view|
+			var sel = view.selection(0);
+			// selection update
+			selectionView.string = "Start: %, length: %, end: %".format(
+				sel[0], sel[1], sel.sum
+			);
+		});
+		readButton.states_([["read"]]).action_({
+			var item = this.currentItem, path, key;
+			var win;
+			win = Window("Buffer name", Rect.aboutPoint(Window.screenBounds.center, 120, 60)).front;
+			win.layout = VLayout(
+				StaticText().align_(\center).string_("Enter a buffer name"),
+				TextField().align_(\center).action_({ |view|
+					key = view.string;
+					win.close;
+					if(key.size > 0) {
+						path = this.findPath;
+						Dialog.openPanel({ |p|
+							model.readBuf(key.asSymbol, p);
+						}, path: path);
+					}
+				})
+			);
+		});
+		replaceButton.states_([["replace"]]).action_({
+			var item = this.currentItem,
+			path = this.findPath;
+			Dialog.openPanel({ |p|
+				model.readBuf(item[0], p);  // same key
+			}, path: path);
+		});
+		deleteButton.states_([["delete"]]).action_({
+			var win, item = this.currentItem;
+			if(item.notNil) {
+				win = Window("Confirm", Rect.aboutPoint(Window.screenBounds.center, 120, 60)).front;
+				win.layout = VLayout(
+					StaticText().align_(\center).string_("Delete buffer " ++ item[0]),
+					HLayout(
+						nil,
+						Button().states_([["OK"]]).action_({
+							win.close;
+							buffers.removeAt(item[0]);
+						}),
+						Button().states_([["Cancel"]]).action_({ win.close }),
+						nil
+					)
+				)
+			};
+		});
+		controllers = IdentityDictionary.new;
+		controllers[\buffers] = SimpleController(buffers)
+		.put(\addBuffer, {
+			defer { this.updateItems.updateSfView };  // might have replaced buffer contents
+		})
+		.put(\removeBuffer, {
+			defer { this.updateItems.updateSfView };
+		})
+		.put(\didFree, {
+			controllers.do(_.remove);
+			this.remove;
+		});
+	}
+
+	currentItem {
+		^items[listView.value ?? { -1 }]
+	}
+
+	findPath {
+		var item = this.currentItem, buf, path;
+		if(item.notNil) {
+			buf = buffers[item[0]];
+			if(buf.notNil) {
+				path = buf.path;
+			}
+		};
+		if(path.isNil) {
+			if(model.path.notNil) {
+				path = model.path;
+			} {
+				path = Archive.global.at(\JITModPatch, \lastPath);  // maybe nil
+			};
+		};
+		^path.tryPerform(\dirname)
+	}
+
+	updateItems {
+		var saveItem = this.currentItem, i;
+		items = buffers.buffers.keys.as(Array).sort.collect { |key|
+			var buf = buffers.at(key);
+			[key, "%: Buffer(%, %, %, %)".format(key,
+				buf.numFrames, buf.numChannels, buf.sampleRate, buf.path.basename
+			)]
+		};
+		if(saveItem.notNil) {
+			i = items.detectIndex { |item| item[0] == saveItem[0] };
+		};
+		listView.items = items.collect(_[1]);
+		if(i.notNil) { listView.value = i };
+	}
+
+	updateSfView {
+		var item = this.currentItem, buf, file;
+		if(item.notNil) {
+			buf = buffers.at(item[0]);
+			if(buf.path.notNil) {
+				file = SoundFile.openRead(buf.path);
+				if(file.notNil) {
+					protect {
+						sfView.readFileWithTask(file, doneAction: { file.close });
+					} { |error|
+						if(error.notNil) { file.close };
+					};
+				}
+			} {
+				buf.getToFloatArray(wait: -0.1, timeout: buf.numFrames * 0.0001, action: { |data|
+					sfView.setData(data,
+						channels: buf.numChannels,
+						samplerate: buf.sampleRate
+					)
+				})
+			};
+		};
+	}
 }
 
 // intended as a more readable syntax for audio input sockets
