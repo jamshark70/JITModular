@@ -99,6 +99,7 @@ JITModPatch {
 		};
 		controllers[\buffers] = SimpleController(buffers)
 		.put(\addBuffer, { |obj, what, name|
+			// these should automatically 'dirty' the patch
 			proxyspace.put(name, buffers.asRef(name));
 		})
 		.put(\removeBuffer, { |obj, what, name|
@@ -352,7 +353,9 @@ JITModPatchGui {
 	<view, window,
 	psGuiView, psGui,
 	saveButton, saveAsButton, loadButton, clearButton,
-	// bufferView,  // not yet
+	midiButton, bufButton,
+	stack,
+	bufferView,  // not yet
 	midiView,
 	connView,
 	controllers;
@@ -382,15 +385,33 @@ JITModPatchGui {
 		window = argWindow;
 		view.layout = VLayout(
 			HLayout(
-				saveButton = Button(),
-				saveAsButton = Button(),
-				loadButton = Button(),
-				clearButton = Button()
-			),
-			HLayout(
-				// bufferView = JMBufferView(),  // not yet - put in StackLayout maybe?
-				midiView = JMMidiView(model),
-				connView = TextView().editable_(false)
+				[VLayout(
+					HLayout(
+						nil,
+						bufButton = Button().fixedWidth_(120)
+						.states_([["Buffers"]])
+						.action_({ stack.index = 0 }),
+						midiButton = Button().fixedWidth_(120)
+						.states_([["MIDI controllers"]])
+						.action_({ stack.index = 1 }),
+						nil
+					),
+					stack = StackLayout(
+						bufferView = /*JMBuffer*/View(),  // not yet - put in StackLayout maybe?
+						midiView = JMMidiView(model),
+					).mode_(\stackOne),
+				), stretch: 1],
+				[VLayout(
+					HLayout(
+						nil,
+						saveButton = Button().fixedWidth_(90),
+						saveAsButton = Button().fixedWidth_(90),
+						loadButton = Button().fixedWidth_(90),
+						clearButton = Button().fixedWidth_(90),
+						nil,
+					),
+					connView = TextView().editable_(false)
+				), stretch: 1]
 			),
 			psGuiView = View().fixedHeight_(295)
 		);
