@@ -595,7 +595,7 @@ Button().states_([["discard"]])
 }
 
 JMBufferSet {
-	var <>model, <server, <buffers, <path;
+	var <>model, <server, <buffers, <path, controllers;
 	// path should be the full path of the .jitmod file -- set in 'save'
 
 	// for loading, we won't have the JITModPatch right now
@@ -612,6 +612,7 @@ JMBufferSet {
 			server = model.proxyspace.server;
 		};
 		buffers = IdentityDictionary.new;
+		controllers = IdentityDictionary.new;
 	}
 
 	clear {
@@ -627,6 +628,10 @@ JMBufferSet {
 
 	put { |name, buffer, replace(true)|
 		var old;
+		if(buffer.isMemberOf(Buffer)) {
+			"Buffers may display incorrectly; use JMBuf instead (name = %)"
+			.format(name.asCompileString).warn;
+		};
 		name = name.asSymbol;
 		if(buffer.isNil) { ^this.removeAt(name) };
 		old = buffers[name];
@@ -636,13 +641,22 @@ JMBufferSet {
 			// wait a bit, to allow new bufnum to propagate out to synths
 			{ old.free }.defer(1);
 			buffers[name] = buffer;
-			this.changed(\addBuffer, name, buffer);
-		}
+			this.changed(*[\addBuffer, name, buffer].debug("sending"));
+		};
+		controllers[buffer.bufnum] = SimpleController(buffer)
+		.put(\done, { |obj, what, cmd, reallyDone|
+			[obj, what, cmd, reallyDone].debug("buffer got done message");
+			if(reallyDone == true) {
+				this.changed(\bufferContentsChanged, obj, cmd, reallyDone);
+			};
+		});
 	}
 
 	removeAt { |name|
 		name = name.asSymbol;
 		if(buffers[name].notNil) {
+			controllers[buffers[name].bufnum].remove;
+			controllers[buffers[name].bufnum] = nil;
 			buffers[name].free;
 			buffers[name] = nil;
 			this.changed(\removeBuffer, name);
@@ -664,18 +678,34 @@ JMBufferSet {
 			File.mkdir(dir);
 		};
 		buffers.keysValuesDo { |name, buffer|
-			buffer.write(dir +/+ name ++ ".wav", "wav", "float");
+			var format;
+			if(buffer.tryPerform(\isWavetable) == true) {
+				name = name ++ "_wt";
+				format = "float";
+			} {
+				format = "int16";
+			};
+			buffer.write(dir +/+ name ++ ".wav", "wav", format);
 		};
 		path = p;
 	}
 
 	load { |path|
-		var dir = this.dir(path), name;
+		var dir = this.dir(path), name, key, wt;
 		if(File.exists(dir) and: { File.type(dir) == \directory }) {
 			this.clear;
 			(dir +/+ "*.wav").pathMatch.do { |path|
-				name = path.basename.splitext[0].asSymbol;
-				buffers[name] = Buffer.read(server, path);
+				name = path.basename.splitext[0];
+				wt = name.endsWith("_wt");
+				if(wt) {
+					key = name.drop(-3).asSymbol;
+				} {
+					key = name.asSymbol;
+				};
+				buffers[key] = JMBuf.read(server, path);
+				if(wt) {
+					buffers[key].isWavetable = true;
+				};
 			};
 			^true
 		} {
@@ -741,10 +771,125 @@ JMBufferRef {
 	proxyControlClass { ^StreamControl }
 }
 
+JMBuf : Buffer {
+	var <>isWavetable = false, <pending, resp;
+
+	// unfortunately there isn't much of a way to intervene in the *new process
+	// given that all the creation methods call "super.newCopyArgs" instead of "this"
+	// hack-a-rama
+	cache {
+		super.cache;
+		if(resp.isNil) {
+			resp = OSCFunc({ |msg|
+				var reallyDone = (msg[1] == pending);
+				if(reallyDone) { pending = nil };
+				this.changed(*[\done, msg[1], reallyDone].debug("sending"));
+			}, '/done', server.addr, argTemplate: [nil, bufnum]);
+		};
+	}
+
+	allocMsg { arg completionMessage;
+		pending = \alloc;
+		^super.allocMsg(completionMessage)
+	}
+
+	// unfortunately the wavetable-generated methods are not modularized at all
+	normalize { arg newmax = 1, asWavetable = false;
+		super.normalize(newmax, asWavetable);
+		isWavetable = asWavetable;
+		pending = '/normalize';
+		// this.changed(\contents);
+	}
+
+	normalizeMsg { arg newmax = 1, asWavetable = false;
+		var result = super.normalize(newmax, asWavetable);
+		isWavetable = asWavetable;
+		// this.changed(\contents);  // assuming it will be sent, caller waits for /done
+		pending = '/normalize';
+		^result
+	}
+
+	gen { arg genCommand, genArgs, normalize = true, asWavetable = true, clearFirst = true;
+		super.gen(genCommand, genArgs, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+	}
+
+	genMsg { arg genCommand, genArgs, normalize = true, asWavetable = true, clearFirst = true;
+		var result = super.gen(genCommand, genArgs, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+		^result
+	}
+
+	sine1 { arg amps, normalize = true, asWavetable = true, clearFirst = true;
+		super.sine1(amps, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+	}
+
+	sine2 { arg freqs, amps, normalize = true, asWavetable = true, clearFirst = true;
+		super.sine2(freqs, amps, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+	}
+
+	sine3 { arg freqs, amps, phases, normalize = true, asWavetable = true, clearFirst = true;
+		super.sine3(freqs, amps, phases, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+	}
+
+	cheby { arg amps, normalize = true, asWavetable = true, clearFirst = true;
+		super.cheby(amps, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+	}
+
+	sine1Msg { arg amps, normalize = true, asWavetable = true, clearFirst = true;
+		var result = super.sine1Msg(amps, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+		^result
+	}
+
+	sine2Msg { arg freqs, amps, normalize = true, asWavetable = true, clearFirst = true;
+		var result = super.sine2Msg(freqs, amps, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+		^result
+	}
+
+	sine3Msg { arg freqs, amps, phases, normalize = true, asWavetable = true, clearFirst = true;
+		var result = super.sine3Msg(freqs, amps, phases, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+		^result
+	}
+
+	chebyMsg { arg amps, normalize = true, asWavetable = true, clearFirst = true;
+		var result = super.chebyMsg(amps, normalize, asWavetable, clearFirst);
+		isWavetable = asWavetable;
+		pending = '/b_gen';
+		// this.changed(\contents);
+		^result
+	}
+}
+
 JMBufferView : SCViewHolder {
 	var model, buffers;
 	var listView, items, sfView, selectionView, controllers;
 	var readButton, replaceButton, deleteButton;
+	var current;
 
 	*new { |model| ^super.new.init(model) }
 
@@ -770,7 +915,8 @@ JMBufferView : SCViewHolder {
 		items = Array.new;
 		this.updateItems.updateSfView;
 		listView.action_({ |view|
-			this.updateSfView(items[view.value][0]);
+			current = view.value;
+			this.updateSfView(items[current][0]);
 		});
 		sfView.action_({ |view|
 			var sel = view.selection(0);
@@ -825,10 +971,20 @@ JMBufferView : SCViewHolder {
 		controllers = IdentityDictionary.new;
 		controllers[\buffers] = SimpleController(buffers)
 		.put(\addBuffer, {
-			defer { this.updateItems.updateSfView };  // might have replaced buffer contents
+			defer { this.debug("updating view (addBuffer)").updateItems.updateSfView };  // might have replaced buffer contents
 		})
 		.put(\removeBuffer, {
 			defer { this.updateItems.updateSfView };
+		})
+		.put(\bufferContentsChanged, { |obj, what, buf, cmd, reallyDone|
+			var item;
+			[\bufferContentsChanged, obj, what, buf, cmd, reallyDone].debug("gui got message");
+			if(reallyDone.debug("reallyDone") == true) {
+				item = this.currentItem;
+				if(item.debug("checking").notNil and: { buffers[item[0]].debug("current displayed buf") === buf.debug("passed-in buf") }) {
+					defer { this.debug("doing it").updateSfView };
+				};
+			};
 		})
 		.put(\didFree, {
 			controllers.do(_.remove);
@@ -837,7 +993,7 @@ JMBufferView : SCViewHolder {
 	}
 
 	currentItem {
-		^items[listView.value ?? { -1 }]
+		^items[current ?? { -1 }] // items[listView.value ?? { -1 }]
 	}
 
 	findPath {
@@ -861,23 +1017,29 @@ JMBufferView : SCViewHolder {
 	updateItems {
 		var saveItem = this.currentItem, i;
 		items = buffers.buffers.keys.as(Array).sort.collect { |key|
-			var buf = buffers.at(key);
+			var buf = buffers.at(key),
+			base = if(buf.path.notNil) { buf.path.basename } { "n/a" };
 			[key, "%: Buffer(%, %, %, %)".format(key,
-				buf.numFrames, buf.numChannels, buf.sampleRate, buf.path.basename
+				buf.numFrames, buf.numChannels, buf.sampleRate, base
 			)]
 		};
 		if(saveItem.notNil) {
 			i = items.detectIndex { |item| item[0] == saveItem[0] };
 		};
 		listView.items = items.collect(_[1]);
-		if(i.notNil) { listView.value = i };
+		if(items.size > 0) {
+			i = i ?? { 0 };
+		};
+		current = i;
+		listView.value = i;
 	}
 
 	updateSfView {
-		var item = this.currentItem, buf, file;
+		var item = this.currentItem.debug("updateSfView item"), buf, file, temp;
 		if(item.notNil) {
 			buf = buffers.at(item[0]);
-			if(buf.path.notNil) {
+			if(buf.path.notNil and: { buf.tryPerform(\isWavetable) != true }) {
+				// use readFileWithTask only if there's a file and it's not a wavetable
 				file = SoundFile.openRead(buf.path);
 				if(file.notNil) {
 					protect {
@@ -887,11 +1049,19 @@ JMBufferView : SCViewHolder {
 					};
 				}
 			} {
+				if(buf.tryPerform(\pending).debug("pending").notNil) { ^this };  // ignore in-process buffers
 				buf.getToFloatArray(wait: -0.1, timeout: buf.numFrames * 0.0001, action: { |data|
-					sfView.setData(data,
-						channels: buf.numChannels,
-						samplerate: buf.sampleRate
-					)
+					if(buf.tryPerform(\isWavetable).debug("wavetable") == true) {
+						temp = FloatArray.new(data.size div: 2);
+						data.pairsDo({ |a, b| temp.add(a+b) });
+						data = temp;
+					};
+					defer {
+						sfView.setData(data,
+							channels: buf.numChannels,
+							samplerate: buf.sampleRate.asInteger
+						)
+					}
 				})
 			};
 		} {
