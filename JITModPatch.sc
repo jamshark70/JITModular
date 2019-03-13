@@ -932,7 +932,7 @@ JMBufferView : SCViewHolder {
 		this.updateItems.updateSfView;
 		listView.action_({ |view|
 			current = view.value;
-			this.updateSfView(items[current][0]);
+			this.updateSfView;
 		});
 		sfView.action_({ |view|
 			var sel = view.selection(0);
@@ -986,8 +986,17 @@ JMBufferView : SCViewHolder {
 		});
 		controllers = IdentityDictionary.new;
 		controllers[\buffers] = SimpleController(buffers)
-		.put(\addBuffer, {
-			defer { this.updateItems.updateSfView };  // might have replaced buffer contents
+		.put(\addBuffer, { |obj, what, name, buffer|
+			var i;
+			defer {
+				this.updateItems;
+				i = items.detectIndex { |item| item[0] == name };
+				if(i.notNil) {
+					defer { listView.valueAction = i };
+				} {
+					this.updateSfView  // might have replaced buffer contents
+				};
+			};
 		})
 		.put(\removeBuffer, {
 			defer { this.updateItems.updateSfView };
