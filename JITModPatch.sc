@@ -27,7 +27,6 @@ JITModPatch {
 		if(server.isNil) { server = Server.default };
 		// .load boots the server automatically; .new doesn't
 		NotificationCenter.registerOneShot(this, \ready, \init, {
-			"got ready".debug;
 			server.waitForBoot {  // just to be sure
 				proxyspace = StereoProxySpace(server, name);
 				buffers = JMBufferSet(this);
@@ -140,7 +139,7 @@ JITModPatch {
 		// else (btw, later implement default path)
 		FileDialog(
 			{ |path| new.load(path) },
-			{ NotificationCenter.notify(new, \ready.debug("canceled, notifying")) },  // finish initing empty patch
+			{ NotificationCenter.notify(new, \ready) },  // finish initing empty patch
 			fileMode: 1, acceptMode: 0, stripResult: true,
 			path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		^new  // you can have it now but it will be ready later
@@ -653,11 +652,10 @@ JMBufferSet {
 			// wait a bit, to allow new bufnum to propagate out to synths
 			{ old.free }.defer(1);
 			buffers[name] = buffer;
-			this.changed(*[\addBuffer, name, buffer].debug("sending"));
+			this.changed(\addBuffer, name, buffer);
 		};
 		controllers[buffer.bufnum] = SimpleController(buffer)
 		.put(\done, { |obj, what, cmd, reallyDone|
-			[obj, what, cmd, reallyDone].debug("buffer got done message");
 			if(reallyDone == true) {
 				this.changed(\bufferContentsChanged, obj, cmd, reallyDone);
 			};
@@ -795,7 +793,7 @@ JMBuf : Buffer {
 			resp = OSCFunc({ |msg|
 				var reallyDone = (msg[1] == pending);
 				if(reallyDone) { pending = nil };
-				this.changed(*[\done, msg[1], reallyDone].debug("sending"));
+				this.changed(\done, msg[1], reallyDone);
 			}, '/done', server.addr, argTemplate: [nil, bufnum]);
 		};
 	}
@@ -989,18 +987,17 @@ JMBufferView : SCViewHolder {
 		controllers = IdentityDictionary.new;
 		controllers[\buffers] = SimpleController(buffers)
 		.put(\addBuffer, {
-			defer { this.debug("updating view (addBuffer)").updateItems.updateSfView };  // might have replaced buffer contents
+			defer { this.updateItems.updateSfView };  // might have replaced buffer contents
 		})
 		.put(\removeBuffer, {
 			defer { this.updateItems.updateSfView };
 		})
 		.put(\bufferContentsChanged, { |obj, what, buf, cmd, reallyDone|
 			var item;
-			[\bufferContentsChanged, obj, what, buf, cmd, reallyDone].debug("gui got message");
-			if(reallyDone.debug("reallyDone") == true) {
+			if(reallyDone == true) {
 				item = this.currentItem;
-				if(item.debug("checking").notNil and: { buffers[item[0]].debug("current displayed buf") === buf.debug("passed-in buf") }) {
-					defer { this.debug("doing it").updateSfView };
+				if(item.notNil and: { buffers[item[0]] === buf }) {
+					defer { this.updateSfView };
 				};
 			};
 		})
@@ -1038,7 +1035,7 @@ JMBufferView : SCViewHolder {
 			var buf = buffers.at(key),
 			base = if(buf.path.notNil) { buf.path.basename } { "n/a" };
 			[key, "%: Buffer(%, %, %, %)".format(key,
-				buf.numFrames, buf.numChannels, buf.sampleRate, base
+				buf.numFrames, buf.numChannels, buf.sampleRate.asInteger, base
 			)]
 		};
 		if(saveItem.notNil) {
@@ -1053,7 +1050,7 @@ JMBufferView : SCViewHolder {
 	}
 
 	updateSfView {
-		var item = this.currentItem.debug("updateSfView item"), buf, file, temp;
+		var item = this.currentItem, buf, file, temp;
 		if(item.notNil) {
 			buf = buffers.at(item[0]);
 			if(buf.path.notNil and: { buf.tryPerform(\isWavetable) != true }) {
@@ -1067,9 +1064,9 @@ JMBufferView : SCViewHolder {
 					};
 				}
 			} {
-				if(buf.tryPerform(\pending).debug("pending").notNil) { ^this };  // ignore in-process buffers
+				if(buf.tryPerform(\pending).notNil) { ^this };  // ignore in-process buffers
 				buf.getToFloatArray(wait: -0.1, timeout: buf.numFrames * 0.0001, action: { |data|
-					if(buf.tryPerform(\isWavetable).debug("wavetable") == true) {
+					if(buf.tryPerform(\isWavetable) == true) {
 						temp = FloatArray.new(data.size div: 2);
 						data.pairsDo({ |a, b| temp.add(a+b) });
 						data = temp;
