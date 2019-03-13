@@ -87,9 +87,12 @@ JITModPatch {
 			controllers.do(_.remove);
 		};
 		controllers[\proxyspace] = SimpleController(proxyspace)
-		.put(\newProxy, { |obj, what, proxy|
+		.put(\newProxy, { |obj, what, proxy, loading|
 			makeCtl.(proxy);
-			this.dirty = true;
+			// if we are in the process of loading a patch, don't set 'dirty'
+			if(loading.isNil) {
+				this.dirty = true;
+			};
 		});
 		proxyspace.keysValuesDo { |key, proxy|
 			makeCtl.(proxy);
@@ -133,6 +136,7 @@ JITModPatch {
 		var file = File(p, "r"), code, archive, saveExecutingPath;
 		if(file.isOpen) {
 			proxyspace.server.waitForBoot {
+				Library.put(\JITModPatch, \nowLoading, this);
 				protect {
 					this.clear;
 					code = file.readAllString;
@@ -141,6 +145,7 @@ JITModPatch {
 					archive = code.interpret;
 					this.initFromArchive(archive);
 				} { |error|
+					Library.global.removeEmptyAt(\JITModPatch, \nowLoading);
 					thisProcess.nowExecutingPath = saveExecutingPath;
 					file.close;
 					defer {  // defer to allow error to clear before handling
