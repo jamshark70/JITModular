@@ -1,5 +1,5 @@
 JITModPatch {
-	var <>name;
+	var <name;
 	var <>proxyspace, <>buffers, <>midi;
 	var <>doc, gui;
 	var <path;
@@ -132,7 +132,6 @@ JITModPatch {
 	load { |p|
 		var file = File(p, "r"), code, archive, saveExecutingPath;
 		if(file.isOpen) {
-			this.path = p;
 			proxyspace.server.waitForBoot {
 				protect {
 					this.clear;
@@ -148,6 +147,7 @@ JITModPatch {
 						if(error.notNil) {
 							this.changed(\load, \error, error);
 						} {
+							this.path = p;
 							this.changed(\load, \success);
 						}
 					};
@@ -214,10 +214,16 @@ JITModPatch {
 		}
 	}
 
+	name_ { |n|
+		name = n;
+		this.changed(\name, name);
+	}
+
 	path_ { |p|
 		path = p;
 		if(path.notNil) {
 			Archive.put(\JITModPatch, \lastPath, path);
+			if(name.isNil) { this.name = path.basename.splitext[0] };
 		};
 	}
 
@@ -347,7 +353,7 @@ JITModPatchGui {
 		var view, iMadeWindow = false;
 		if(parent.isNil) {
 			// ProxyMixer may be up to 1086 wide
-			parent = Window("JITModPatch: %".format(model.name), Rect(100, 200, 1120, 600))
+			parent = Window("JITModPatch: %".format(model.name ?? { "Untitled" }), Rect(100, 200, 1120, 600))
 			.userCanClose_(false)
 			.front;
 			iMadeWindow = true;
@@ -427,8 +433,14 @@ Button().states_([["discard"]])
 		.put(\dirty, { |obj, what, bool|
 			defer { saveButton.enabled = bool };
 		})
-		// fill in later for connection view
 		.put(\set, { |args| this.updateConn(args) })
+		.put(\name, { |obj, what, name|
+			if(window.notNil) {
+				defer {
+					window.name = "JITModPatch: " ++ (name ?? { "Untitled" });
+				};
+			};
+		})
 		.put(\didFree, {
 			this.close;
 			controllers.do(_.remove);
