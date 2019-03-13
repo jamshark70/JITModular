@@ -295,7 +295,7 @@ JITModPatch {
 
 	// buffers
 	readBuf { |name, path, startFrame = 0, numFrames = -1, action|
-		var buf = Buffer(server),
+		var buf = JMBuf(server),
 		finish = this.prFinishBufAction(name, buf);
 		buf.doOnInfo = {
 			finish.value(true);
@@ -313,7 +313,7 @@ JITModPatch {
 		if(channels.isNil) {
 			Error("JITModPatch:readBufChannel: Please supply a 'channels' array").throw;
 		};
-		buf = Buffer(server);
+		buf = JMBuf(server);
 		finish = this.prFinishBufAction(name, buf);
 		buf.doOnInfo = {
 			finish.value(true);
