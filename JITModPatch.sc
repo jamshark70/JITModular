@@ -25,13 +25,14 @@ JITModPatch {
 		name = argName;
 		if(server.isNil) { server = Server.default };
 		// .load boots the server automatically; .new doesn't
-		if(server.serverRunning.not) { server.boot };
-		proxyspace = StereoProxySpace(server, name);
-		buffers = JMBufferSet(this);
-		this.initDoc;
-		this.initController;
-		JITModPatchGui(this);  // uses dependencies
-		this.dirty = false;
+		server.waitForBoot {
+			proxyspace = StereoProxySpace(server, name);
+			buffers = JMBufferSet(this);
+			this.initDoc;
+			this.initController;
+			JITModPatchGui(this);  // uses dependencies
+			this.dirty = false;
+		};
 	}
 
 	initFromArchive { |archive|
@@ -808,7 +809,7 @@ JMBufferView : SCViewHolder {
 			if(item.notNil) {
 				win = Window("Confirm", Rect.aboutPoint(Window.screenBounds.center, 120, 60)).front;
 				win.layout = VLayout(
-					StaticText().align_(\center).string_("Delete buffer " ++ item[0]),
+					StaticText().align_(\center).string_("Delete buffer %?".format(item[0])),
 					HLayout(
 						nil,
 						Button().states_([["OK"]]).action_({
@@ -893,6 +894,8 @@ JMBufferView : SCViewHolder {
 					)
 				})
 			};
+		} {
+			sfView.setData([0], channels: 1, samplerate: model.proxyspace.server.sampleRate.asInteger);
 		};
 	}
 }
