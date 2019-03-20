@@ -188,44 +188,63 @@ JITModPatch {
 
 	prSave { |p|
 		var file = File(p, "w");
+		var text,
+		getDoc = { |cond|
+			// hacking into Document internals a bit
+			// the backend still exists for this, just "hidden"
+			// in the official Document interface
+			// Windows sometimes loses Document text mirroring
+			// so this is the only safe way to be sure we get *all* the contents
+			var funcID = ScIDE.getQUuid;
+			Document.asyncActions[funcID] = { |str|
+				text = str;
+				cond.unhang;
+			};
+			ScIDE.getTextByQUuid(doc.quuid, funcID, 0, -1);
+		};
 		if(file.isOpen) {
 			this.path = p;
-			protect {
-				// file's end result should be the patch
-				file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
-				.format(proxyspace.class.name, name.asCompileString);
-				file << "var doc = " <<< doc.string << ";\n";
-				if(buffers.notEmpty) {
-					buffers.save(path);
-					buffers.storeOn(file);
+			{
+				var cond = Condition.new;
+				protect {
+					// file's end result should be the patch
+					file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
+					.format(proxyspace.class.name, name.asCompileString);
+					getDoc.value(cond);
+					cond.hang;
+					file << "var doc = " <<< text << ";\n";
+					if(buffers.notEmpty) {
+						buffers.save(path);
+						buffers.storeOn(file);
+					};
+					if(midi.notNil) {
+						file << "midi = ";
+						midi.storeOn(file);
+						file << "(proxyspace);\n";
+					};
+					file << "\nproxyspace.use {\n\n";
+					// guarantee that buffer proxies get populated first
+					// otherwise patterns may look for ~xyz.source and find nothing
+					buffers.buffers.keysValuesDo { |name, buf|
+						file << "~" << name << " = buffers.asRef(" <<< name << ");\n";
+					};
+					file << "\n";
+					proxyspace.use { proxyspace.storeOn2(file) };
+					file << "\};\n";
+					// result for loading, should embed real objects
+					file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers)\n";
+				} { |error|
+					file.close;
+					defer {  // defer to allow error to clear before handling
+						if(error.notNil) {
+							this.changed(\save, \error, error);
+						} {
+							this.dirty = false;
+							this.changed(\save, \success);
+						}
+					};
 				};
-				if(midi.notNil) {
-					file << "midi = ";
-					midi.storeOn(file);
-					file << "(proxyspace);\n";
-				};
-				file << "\nproxyspace.use {\n\n";
-				// guarantee that buffer proxies get populated first
-				// otherwise patterns may look for ~xyz.source and find nothing
-				buffers.buffers.keysValuesDo { |name, buf|
-					file << "~" << name << " = buffers.asRef(" <<< name << ");\n";
-				};
-				file << "\n";
-				proxyspace.use { proxyspace.storeOn2(file) };
-				file << "\};\n";
-				// result for loading, should embed real objects
-				file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers)\n";
-			} { |error|
-				file.close;
-				defer {  // defer to allow error to clear before handling
-					if(error.notNil) {
-						this.changed(\save, \error, error);
-					} {
-						this.dirty = false;
-						this.changed(\save, \success);
-					}
-				};
-			};
+			}.fork(AppClock);
 		} {
 			"JITModPatch:% could not open '%' for saving".format(name, path).warn;
 			this.changed(\save, \openFailed);
