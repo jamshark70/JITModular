@@ -181,11 +181,7 @@ JMMidiView : SCViewHolder {
 		this.view = ScrollView();  // assumes in a layout
 		view.canvas = View();
 		view.canvas.layout = layout = VLayout(
-			StaticText()
-			.font_(Font.default.size_(18))
-			.string_("MIDI Controllers")
-			.fixedHeight_(30),
-			View()  // dummy spacer
+			View()  // dummy spacer, should always be last
 		);
 		controllers = IdentityDictionary.new;
 		controllers[\model] = SimpleController(model)
