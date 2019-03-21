@@ -76,7 +76,12 @@ JITModPatch {
 				};
 				if(pairs.size > 0) {
 					// send only mappings, not setting fixed values
-					this.changed(\set, args)
+					// because this is for the connection view
+					// NdefGui polls for value changes
+					this.changed(\setMapping, args)
+				};
+				if(dirty.not) {
+					this.dirty = true;  // but changing anything dirties the state
 				};
 			};
 			controllers[key] = SimpleController(proxy)
@@ -493,7 +498,7 @@ Button().states_([["discard"]])
 		.put(\dirty, { |obj, what, bool|
 			defer { saveButton.enabled = bool };
 		})
-		.put(\set, { |args| this.updateConn(args) })
+		.put(\setMapping, { |args| this.updateConn(args) })
 		.put(\name, { |obj, what, name|
 			if(window.notNil) {
 				defer {
