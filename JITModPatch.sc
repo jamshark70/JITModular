@@ -828,6 +828,32 @@ JMBuf : Buffer {
 		^super.allocMsg(completionMessage)
 	}
 
+	allocReadMsg { arg argpath, startFrame = 0, numFrames = -1, completionMessage;
+		var msg = super.allocReadMsg(argpath, startFrame, numFrames, completionMessage);
+		pending = '/b_allocRead';
+		^msg
+	}
+
+	allocReadChannelMsg { arg argpath, startFrame = 0, numFrames = -1, channels, completionMessage;
+		var msg = super.allocReadChannelMsg(argpath, startFrame, numFrames, channels, completionMessage);
+		pending = '/b_allocReadChannel';
+		^msg
+	}
+
+	readMsg { arg argpath, fileStartFrame = 0, numFrames = -1,
+		bufStartFrame = 0, leaveOpen = false, completionMessage;
+		var msg = super.readMsg(argpath, fileStartFrame, numFrames, bufStartFrame, leaveOpen, completionMessage);
+		pending = '/b_read';
+		^msg
+	}
+
+	readChannelMsg { arg argpath, fileStartFrame = 0, numFrames = -1,
+		bufStartFrame = 0, leaveOpen = false, channels, completionMessage;
+		var msg = super.readChannelMsg(argpath, fileStartFrame, numFrames, bufStartFrame, leaveOpen, channels, completionMessage);
+		pending = '/b_readChannel';
+		^msg
+	}
+
 	// unfortunately the wavetable-generated methods are not modularized at all
 	normalize { arg newmax = 1, asWavetable = false;
 		super.normalize(newmax, asWavetable);
@@ -1025,7 +1051,9 @@ JMBufferView : SCViewHolder {
 			if(reallyDone == true) {
 				item = this.currentItem;
 				if(item.notNil and: { buffers[item[0]] === buf }) {
-					defer { this.updateSfView };
+					// for allocRead[Channel], numFrames/numChannels may have changed
+					// need to rebuild the item list too
+					defer { this.updateItems.updateSfView };
 				};
 			};
 		})
@@ -1063,7 +1091,10 @@ JMBufferView : SCViewHolder {
 			var buf = buffers.at(key),
 			base = if(buf.path.notNil) { buf.path.basename } { "n/a" };
 			[key, "%: Buffer(%, %, %, %)".format(key,
-				buf.numFrames, buf.numChannels, buf.sampleRate.asInteger, base
+				buf.numFrames,
+				buf.numChannels,
+				(buf.sampleRate ?? { buf.server.sampleRate }).asInteger,
+				base
 			)]
 		};
 		if(saveItem.notNil) {
@@ -1086,7 +1117,9 @@ JMBufferView : SCViewHolder {
 				file = SoundFile.openRead(buf.path);
 				if(file.notNil) {
 					protect {
-						sfView.readFileWithTask(file, doneAction: { file.close });
+						sfView.readFileWithTask(file, buf.startFrame, buf.numFrames,
+							doneAction: { file.close }
+						);
 					} { |error|
 						if(error.notNil) { file.close };
 					};
