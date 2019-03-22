@@ -231,8 +231,18 @@ StereoProxySynthDef : SynthDef {
 
 StereoProxySpace : ProxySpace {
 	makeProxy {
+		// kinda ugly and will not work if I have to switch it to standard JITLib later
+		// It's really not ideal to have a binding between JITLib and my patch GUI.
+		// But 'defer' means that we have to save the loading state here and pass it back
+		// using Library to avoid a classvar
+		var loading = Library.at(\JITModPatch, \nowLoading);
+
 		var proxy = StereoNodeProxy.new(server);
 		this.initProxy(proxy);
+		// callback; note, we haven't saved the proxy into the space yet
+		// so we have to wait a tick
+		// note also that, without the number, 'defer' doesn't defer :-\
+		{ this.changed(\newProxy, proxy, loading) }.defer(0);
 		^proxy
 	}
 }
