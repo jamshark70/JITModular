@@ -187,6 +187,10 @@
 		};
 
 		docStr = String.streamContents { |stream|
+			if(includeSettings and: { this.quant.notNil }) {
+				stream <<< this << ".quant = " <<< quant << ";\n";
+			};
+
 			if(isSingle) {
 				str = nameStr;
 				srcStr = if (this.source.notNil) { this.source.envirCompileString } { "" };
