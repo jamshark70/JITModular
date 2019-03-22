@@ -162,7 +162,9 @@ JMMIDI {
 				<<< item[\spec] << ");\n";
 			};
 		};
-		stream << "}.value";
+		// also need to wait a tick (this is AppClock, it's OK even if MIDI init takes awhile)
+		// and return the JMMIDI object
+		stream << "\t0.1.wait;\n\tnew;\n}.value";
 	}
 }
 
