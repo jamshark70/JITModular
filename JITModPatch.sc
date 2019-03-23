@@ -662,7 +662,17 @@ JMBufferSet {
 	at { |name| ^buffers[name.asSymbol] }
 
 	put { |name, buffer, replace(true)|
-		var old;
+		var old, arrayID;
+		// array of buffers? allocConsecutive
+		if(buffer.size > 0) {
+			name = name.asString;
+			arrayID = UniqueID.next;
+			buffer.do { |buf, i|
+				buf.arrayID = arrayID;
+				this.put((name ++ i.asString.padLeft(3, "0")).asSymbol, buf);
+			};
+			^this
+		};
 		if(buffer.isMemberOf(Buffer)) {
 			"Buffers may display incorrectly; use JMBuf instead (name = %)"
 			.format(name.asCompileString).warn;
@@ -712,12 +722,20 @@ JMBufferSet {
 			File.mkdir(dir);
 		};
 		buffers.keysValuesDo { |name, buffer|
-			var format;
+			var format, match;
 			if(buffer.tryPerform(\isWavetable) == true) {
 				name = name ++ "_wt";
 				format = "float";
 			} {
+				name = name.asString;
 				format = "int16";
+			};
+			if(buffer.tryPerform(\arrayID).notNil) {
+				// mark buffer arrays with filenames like "a[000]_wt.wav"
+				match = name.findRegexp("[0-9][0-9][0-9]");
+				if(match.notNil) {
+					name = name.replace(match[0][1], "[" ++ match[0][1] ++ "]");
+				};
 			};
 			buffer.write(dir +/+ name ++ ".wav", "wav", format);
 		};
@@ -725,21 +743,46 @@ JMBufferSet {
 	}
 
 	load { |path|
-		var dir = this.dir(path), name, key, wt;
+		var dir = this.dir(path), paths, arrayPaths, name, key, wt,
+		loadOne = { |path, buf|
+			var match;
+			name = path.basename.splitext[0];
+			match = name.findRegexp("\\[([0-9][0-9][0-9])\\]");
+			if(match.notNil) {
+				name = name.replace(match[0][1], match[1][1]);  // strip brackets from name, for key
+			};
+			wt = name.endsWith("_wt");
+			if(wt) {
+				key = name.drop(-3).asSymbol;
+			} {
+				key = name.asSymbol;
+			};
+			if(buf.isNil) {
+				buf = JMBuf(server);
+			};
+			buffers[key] = buf.allocRead(path, completionMessage: { |buf| ["/b_query", buf.bufnum] });
+			if(wt) {
+				buffers[key].isWavetable = true;
+			};
+		};
 		if(File.exists(dir) and: { File.type(dir) == \directory }) {
 			this.clear;
-			(dir +/+ "*.wav").pathMatch.do { |path|
-				name = path.basename.splitext[0];
-				wt = name.endsWith("_wt");
-				if(wt) {
-					key = name.drop(-3).asSymbol;
-				} {
-					key = name.asSymbol;
-				};
-				buffers[key] = JMBuf.read(server, path);
-				if(wt) {
-					buffers[key].isWavetable = true;
-				};
+			paths = (dir +/+ "*.wav").pathMatch;
+			// need to search for indices; keep arrays together (consecutive bufnums)
+			arrayPaths = paths.collect { |path| [path, path.findRegexp("\\[[0-9][0-9][0-9]\\]")] }
+			.select { |pair| pair[1].notNil }
+			.separate { |a, b|
+				a[0][ .. a[1][0][0]] != b[0][ .. b[1][0][0]]
+			}
+			.do { |pathArray|
+				var bufBase = server.bufferAllocator.alloc(pathArray.size);
+				pathArray.do { |pair, i| loadOne.(pair[0], JMBuf(server, bufnum: bufBase + i)) };
+			};
+			arrayPaths = arrayPaths.collect { |array| array.collect(_[0]) }.flatten(1);
+			paths.do { |path|
+				if(arrayPaths.every { |a| a != path }) {
+					loadOne.(path)
+				}
 			};
 			^true
 		} {
@@ -806,7 +849,18 @@ JMBufferRef {
 }
 
 JMBuf : Buffer {
-	var <>isWavetable = false, <pending, resp;
+	var <>isWavetable = false, <pending, <>arrayID, resp;
+
+	*allocConsecutive { arg numBufs = 1, server, numFrames, numChannels = 1, completionMessage, bufnum;
+		var	bufBase, newBuf;
+		bufBase = bufnum ?? { server.nextBufferNumber(numBufs) };
+		^Array.fill(numBufs, { |i|
+			newBuf = JMBuf.new(server, numFrames, numChannels, i + bufBase);
+			server.sendMsg(\b_alloc, i + bufBase, numFrames, numChannels,
+				completionMessage.value(newBuf, i));
+			newBuf.cache
+		})
+	}
 
 	// unfortunately there isn't much of a way to intervene in the *new process
 	// given that all the creation methods call "super.newCopyArgs" instead of "this"
