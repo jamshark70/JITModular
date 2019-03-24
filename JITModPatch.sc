@@ -775,8 +775,12 @@ JMBufferSet {
 				a[0][ .. a[1][0][0]] != b[0][ .. b[1][0][0]]
 			}
 			.do { |pathArray|
-				var bufBase = server.bufferAllocator.alloc(pathArray.size);
-				pathArray.do { |pair, i| loadOne.(pair[0], JMBuf(server, bufnum: bufBase + i)) };
+				var bufBase = server.bufferAllocator.alloc(pathArray.size),
+				arrayID = UniqueID.next;  // arrayed buffers must be tagged, for saving later
+				pathArray.do { |pair, i|
+					var new = JMBuf(server, bufnum: bufBase + i).arrayID_(arrayID);
+					loadOne.(pair[0], new)
+				};
 			};
 			arrayPaths = arrayPaths.collect { |array| array.collect(_[0]) }.flatten(1);
 			paths.do { |path|
