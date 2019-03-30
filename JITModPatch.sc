@@ -480,7 +480,7 @@ JITModPatchGui {
 						Button().states_([["save as"]])
 						.action_({
 							saveWin.close;
-							this.prSave(model.path, { model.clear });
+							this.prSave(nil, { model.clear });
 						}),
 Button().states_([["discard"]])
 						.action_({ saveWin.close; model.clear }),
