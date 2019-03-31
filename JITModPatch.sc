@@ -733,7 +733,7 @@ JMBufferSet {
 			if(buffer.tryPerform(\arrayID).notNil) {
 				// mark buffer arrays with filenames like "a[000]_wt.wav"
 				match = name.findRegexp("[0-9][0-9][0-9]");
-				if(match.notNil) {
+				if(match.size > 0) {
 					name = name.replace(match[0][1], "[" ++ match[0][1] ++ "]");
 				};
 			};
@@ -748,7 +748,7 @@ JMBufferSet {
 			var match;
 			name = path.basename.splitext[0];
 			match = name.findRegexp("\\[([0-9][0-9][0-9])\\]");
-			if(match.notNil) {
+			if(match.size > 0) {
 				name = name.replace(match[0][1], match[1][1]);  // strip brackets from name, for key
 			};
 			wt = name.endsWith("_wt");
@@ -770,7 +770,7 @@ JMBufferSet {
 			paths = (dir +/+ "*.wav").pathMatch;
 			// need to search for indices; keep arrays together (consecutive bufnums)
 			arrayPaths = paths.collect { |path| [path, path.findRegexp("\\[[0-9][0-9][0-9]\\]")] }
-			.select { |pair| pair[1].notNil }
+			.select { |pair| pair[1].size > 0 }
 			.separate { |a, b|
 				a[0][ .. a[1][0][0]] != b[0][ .. b[1][0][0]]
 			}
