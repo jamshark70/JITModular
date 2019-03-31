@@ -425,10 +425,10 @@ JITModPatchGui {
 					HLayout(
 						nil,
 						bufButton = Button().fixedWidth_(120)
-						.states_([["Buffers"]])
+						.states_([["Buffers 缓冲区"]])
 						.action_({ stack.index = 0 }),
-						midiButton = Button().fixedWidth_(120)
-						.states_([["MIDI controllers"]])
+						midiButton = Button().fixedWidth_(150)
+						.states_([["MIDI controllers 控制"]])
 						.action_({ stack.index = 1 }),
 						nil
 					),
@@ -441,7 +441,7 @@ JITModPatchGui {
 					HLayout(
 						nil,
 						saveButton = Button().fixedWidth_(90),
-						saveAsButton = Button().fixedWidth_(90),
+						saveAsButton = Button().fixedWidth_(105),
 						loadButton = Button().fixedWidth_(90),
 						clearButton = Button().fixedWidth_(90),
 						nil,
@@ -455,16 +455,16 @@ JITModPatchGui {
 			// must be in the right environment
 			psGui = ProxyMixer(model.proxyspace, 12, psGuiView, Rect(0, 0, 1090, 275));
 		};
-		saveButton.states_([["save"]])
+		saveButton.states_([["save 保存"]])
 		.action_({ model.save(model.path) });  // model.path may be nil; gives file dialog
-		saveAsButton.states_([["save as"]])
+		saveAsButton.states_([["save as 另存为"]])
 		.action_({ model.save(nil) });
-		loadButton.states_([["load"]])
+		loadButton.states_([["load 打开"]])
 		.action_({
 			FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
 				path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 		});
-		clearButton.states_([["quit"]])
+		clearButton.states_([["quit 关闭"]])
 		.action_({
 			if(model.dirty) {
 				saveWin = Window("save?", Rect.aboutPoint(Window.screenBounds.center, 100, 60));
@@ -472,19 +472,19 @@ JITModPatchGui {
 					StaticText().align_(\center).string_("You have unsaved changes."),
 					HLayout(
 						nil,
-						Button().states_([["save"]])
+						Button().states_([["save 保存"]])
 						.action_({
 							saveWin.close;
 							this.prSave(model.path, { model.clear });
 						}),
-						Button().states_([["save as"]])
+						Button().states_([["save as 另存为"]])
 						.action_({
 							saveWin.close;
 							this.prSave(nil, { model.clear });
 						}),
-Button().states_([["discard"]])
+						Button().states_([["discard 抛弃"]])
 						.action_({ saveWin.close; model.clear }),
-						Button().states_([["cancel"]])
+						Button().states_([["cancel 取消"]])
 						.action_({ saveWin.close })
 					)
 				);
@@ -1030,9 +1030,9 @@ JMBufferView : SCViewHolder {
 			),
 			VLayout(
 				nil,
-				readButton = Button().fixedWidth_(80),
-				replaceButton = Button().fixedWidth_(80),
-				deleteButton = Button().fixedWidth_(80),
+				readButton = Button().fixedWidth_(96),
+				replaceButton = Button().fixedWidth_(96),
+				deleteButton = Button().fixedWidth_(96),
 				nil,
 			)
 		);
@@ -1049,7 +1049,7 @@ JMBufferView : SCViewHolder {
 				sel[0], sel[1], sel.sum
 			);
 		});
-		readButton.states_([["read"]]).action_({
+		readButton.states_([["read 打开音频"]]).action_({
 			var item = this.currentItem, path, key;
 			var win;
 			win = Window("Buffer name", Rect.aboutPoint(Window.screenBounds.center, 120, 60)).front;
@@ -1067,14 +1067,14 @@ JMBufferView : SCViewHolder {
 				})
 			);
 		});
-		replaceButton.states_([["replace"]]).action_({
+		replaceButton.states_([["replace 代替"]]).action_({
 			var item = this.currentItem,
 			path = this.findPath;
 			Dialog.openPanel({ |p|
 				model.readBuf(item[0], p);  // same key
 			}, path: path);
 		});
-		deleteButton.states_([["delete"]]).action_({
+		deleteButton.states_([["delete 删除"]]).action_({
 			var win, item = this.currentItem;
 			if(item.notNil) {
 				win = Window("Confirm", Rect.aboutPoint(Window.screenBounds.center, 120, 60)).front;
