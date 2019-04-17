@@ -177,6 +177,7 @@ JMMidiView : SCViewHolder {
 	}
 
 	// http://sccode.org/1-50N: Stretchable ScrollView
+	// a SCViewHolder may reasonably assume it's initting within a GUI thread
 	init { |argModel|
 		model = argModel;
 		ccs = MultiLevelIdentityDictionary.new;  // num --> name --> view
@@ -227,15 +228,22 @@ JMMidiView : SCViewHolder {
 		};
 	}
 
+	// but this may be called from anywhere, so it should defer
+	// (known case: learnCtl --> incoming CC message --> dependency --> here)
 	addCtl { |num, name, spec|
-		var new = JMMidiCtlView(this, num, name, spec);
-		ccs.put(num, name, new);
-		layout.insert(new.view, view.children.size - 1);
+		var new;
+		defer {
+			new = JMMidiCtlView(this, num, name, spec);
+			ccs.put(num, name, new);
+			layout.insert(new.view, view.children.size - 1);
+		};
 	}
 
 	removeCtl { |num, name|
-		ccs.at(num, name).remove;  // drop from GUI
-		ccs.removeEmptyAt(num, name);  // drom from storage
+		defer {
+			ccs.at(num, name).remove;  // drop from GUI
+			ccs.removeEmptyAt(num, name);  // drom from storage
+		};
 	}
 
 	cc { |num, val|
