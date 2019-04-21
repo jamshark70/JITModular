@@ -1,6 +1,6 @@
 JITModPatch {
 	var <name;
-	var <>proxyspace, <>server, <>buffers, <>midi;
+	var <>proxyspace, <>server, <>buffers, <>midi, <customInit, <cleanup;
 	var <>doc, gui;
 	var <path;
 	var <dirty = false;  // I'm not sure I can really support this?
@@ -48,13 +48,13 @@ JITModPatch {
 		proxyspace = archive[\proxyspace];
 		buffers = archive[\buffers] ?? { JMBufferSet(this) };
 		midi = archive[\midi];
+		customInit = archive[\customInit];
 		this.initDoc(archive[\string]);
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
+		customInit.value(this);
 		JITModPatchGui(this);  // uses dependencies
-		// BUG: proxyspace hasn't finished initting
-		// how to know when it's done? there is no clear pattern in timing
-		this.dirty = false;
+		this.dirty = false;  // loader will override this
 	}
 
 	initDoc { |string("")|
@@ -125,6 +125,9 @@ JITModPatch {
 
 	clear {
 		// if(dirty) {};  // ???
+		try { cleanup.value(this) } { |error|
+			if(error.notNil) { error.reportError; "^^^ error thrown during custom cleanup".warn };
+		};
 		controllers.do { |ctl| ctl.remove };
 		controllers.clear;
 		proxyspace.clear;
@@ -218,6 +221,12 @@ JITModPatch {
 					getDoc.value(cond);
 					cond.hang;
 					file << "var doc = " <<< text << ";\n";
+					if(customInit.notNil) {
+						file << "var customInit = " <<< customInit << ";\n";
+					};
+					if(customInit.notNil) {
+						file << "var cleanup = " <<< cleanup << ";\n";
+					};
 					if(buffers.notEmpty) {
 						buffers.save(path);
 						buffers.storeOn(file);
@@ -237,7 +246,7 @@ JITModPatch {
 					proxyspace.use { proxyspace.storeOn2(file) };
 					file << "\};\n";
 					// result for loading, should embed real objects
-					file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers)\n";
+					file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers, customInit: customInit, cleanup: cleanup)\n";
 				} { |error|
 					file.close;
 					defer {  // defer to allow error to clear before handling
@@ -270,6 +279,19 @@ JITModPatch {
 			Archive.put(\JITModPatch, \lastPath, path);
 			if(name.isNil) { this.name = path.basename.splitext[0] };
 		};
+	}
+
+	customInit_ { |func|
+		// proper usage: cleanup removes whatever you created
+		if(func.notNil) {
+			cleanup.value(this);
+		};
+		customInit = func;
+		customInit.value(this);
+	}
+
+	cleanup_ { |func|
+		cleanup = func;
 	}
 
 	dirty_ { |bool|
