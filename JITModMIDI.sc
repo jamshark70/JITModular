@@ -76,7 +76,7 @@ JMMIDI {
 			(type: \psSet, proxyspace: proxyspace, midinote: notes.last,
 				skipArgs: #[amp, pan], gt: 1, t_trig: 0, sustain: inf).play;
 		} {
-			(type: \psSet, proxyspace: proxyspace,
+			(type: \psSet, proxyspace: proxyspace, midinote: num,
 				skipArgs: #[freq, amp, pan], gt: 0, t_trig: 0, sustain: inf).play;
 		};
 		this.changed(\noteOff, num, notes.last);
