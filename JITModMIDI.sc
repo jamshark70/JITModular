@@ -104,7 +104,7 @@ JMMIDI {
 
 	addCtl { |num, name, spec|
 		var key = this.key(num, name),
-		skip = [\freq, \amp, \pan, \gt, \t_trig],
+		skip = [\freq, \midinote, \amp, \pan, \gt, \t_trig],
 		ctl;
 		skip.remove(name);
 		if(spec.isNil) {
