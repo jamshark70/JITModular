@@ -49,6 +49,7 @@ JITModPatch {
 		buffers = archive[\buffers] ?? { JMBufferSet(this) };
 		midi = archive[\midi];
 		customInit = archive[\customInit];
+		cleanup = archive[\cleanup];
 		this.initDoc(archive[\string]);
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
@@ -125,18 +126,22 @@ JITModPatch {
 
 	clear {
 		// if(dirty) {};  // ???
-		try { cleanup.value(this) } { |error|
-			if(error.notNil) { error.reportError; "^^^ error thrown during custom cleanup".warn };
-		};
-		controllers.do { |ctl| ctl.remove };
-		controllers.clear;
-		proxyspace.clear;
-		proxyspace.remove;  // take it out of the global collection, for 'load'
-		buffers.clear;
-		midi.free;
-		doc.tryPerform(\close);  // may not have been initialized, if loading
-		// gui.close; gui = nil;
-		this.changed(\didFree);
+		{
+			try { cleanup.value(this) } { |error|
+				if(error.notNil) { error.reportError; "^^^ error thrown during custom cleanup".warn };
+			};
+			controllers.do { |ctl| ctl.remove };
+			controllers.clear;
+			proxyspace.do { |proxy| proxy.stop };  // disconnect from speakers before clearing
+			0.1.wait;
+			proxyspace.clear;
+			proxyspace.remove;  // take it out of the global collection, for 'load'
+			buffers.clear;
+			midi.free;
+			doc.tryPerform(\close);  // may not have been initialized, if loading
+			// gui.close; gui = nil;
+			this.changed(\didFree);
+		}.fork(AppClock);
 	}
 
 	*load { |path|
@@ -157,9 +162,16 @@ JITModPatch {
 		var file = File(p, "r"), code, archive, saveExecutingPath;
 		if(file.isOpen) {
 			server.waitForBoot {
+				var cond = Condition.new,
+				// 'clear' is asynchronous now
+				ctl = SimpleController(this).put(\didFree, {
+					ctl.remove;
+					cond.unhang;
+				});
 				Library.put(\JITModPatch, \nowLoading, this);
 				protect {
 					this.clear;
+					cond.hang;
 					code = file.readAllString;
 					saveExecutingPath = thisProcess.nowExecutingPath;
 					thisProcess.nowExecutingPath = p;
@@ -221,12 +233,8 @@ JITModPatch {
 					getDoc.value(cond);
 					cond.hang;
 					file << "var doc = " <<< text << ";\n";
-					if(customInit.notNil) {
-						file << "var customInit = " <<< customInit << ";\n";
-					};
-					if(customInit.notNil) {
-						file << "var cleanup = " <<< cleanup << ";\n";
-					};
+					file << "var customInit = " <<< customInit << ";\n";
+					file << "var cleanup = " <<< cleanup << ";\n";
 					if(buffers.notEmpty) {
 						buffers.save(path);
 						buffers.storeOn(file);
