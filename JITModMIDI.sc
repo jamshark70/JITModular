@@ -190,7 +190,8 @@ JMMidiView : SCViewHolder {
 		controllers[\model] = SimpleController(model)
 		.put(\initedMidi, { |obj, what, midi|
 			this.initMidi(midi);
-		});
+		})
+		.put(\didFree, { this.remove; controllers.do(_.remove) });
 		if(model.midi.notNil) {
 			this.initMidi(model.midi);
 		};
@@ -199,7 +200,8 @@ JMMidiView : SCViewHolder {
 	initMidi { |argMidi|
 		midi = argMidi;
 		controllers[\midi] = SimpleController(midi)
-		.put(\didFree, { this.remove; controllers.do(_.remove) })
+		// this never fires if you didn't initMidi; so, free based on patch, not JMMIDI
+		// .put(\didFree, { this.remove; controllers.do(_.remove) })
 		.put(\addCtl, { |obj, what, num, name, spec|
 			this.addCtl(num, name, spec);
 		})
