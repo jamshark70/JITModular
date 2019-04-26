@@ -85,6 +85,7 @@ JITModPatch {
 					this.dirty = true;  // but changing anything dirties the state
 				};
 			};
+			controllers[key].remove;  // if anything was there before, drop it now
 			controllers[key] = SimpleController(proxy)
 			.put(\source, { this.dirty = true })
 			.put(\set, setFunc)
@@ -92,6 +93,7 @@ JITModPatch {
 			// .put(\clear, { ... remove ctl? ... })
 			// per NodeProxy:xfadePerform, it appears that the \map or \set notification
 			// may come from either the nodeproxy or the nodemap...???
+			controllers[(key ++ "_nodeMap").asSymbol].remove;
 			controllers[(key ++ "_nodeMap").asSymbol] = SimpleController(proxy.nodeMap)
 			.put(\set, setFunc)
 			.put(\map, setFunc);
