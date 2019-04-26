@@ -1263,3 +1263,13 @@ JMInput {
 		}
 	}
 }
+
+JMModulation {
+	*linear { |parameter, modSource, modAmount = 1, factor = 1, custom({ |mod, factor| mod * factor })|
+		^parameter + custom.value(modSource * modAmount, factor)
+	}
+
+	*exponential { |parameter, modSource, modAmount = 1, factor = 1, custom({ |mod, factor| factor ** mod })|
+		^parameter * custom.value(modSource * modAmount, factor)
+	}
+}
