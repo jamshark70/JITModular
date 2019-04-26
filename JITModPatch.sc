@@ -234,7 +234,13 @@ JITModPatch {
 					.format(proxyspace.class.name, name.asCompileString);
 					getDoc.value(cond);
 					cond.hang;
-					file << "var doc = " <<< text << ";\n";
+					text = text.clump(8000);
+					file << "var doc = [";
+					text.do { |str, i|
+						if(i > 0) { file << "," };
+						file << "\n\t" <<< str;
+					};
+					file << "\n].join;\n\n";
 					file << "var customInit = " <<< customInit << ";\n";
 					file << "var cleanup = " <<< cleanup << ";\n";
 					if(buffers.notEmpty) {
