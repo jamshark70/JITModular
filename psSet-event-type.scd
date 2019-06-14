@@ -72,13 +72,14 @@ AbstractPlayControl.buildMethods[\psSet] = { |pattern, proxy, channelOffset = 0,
 		\type, \psSet,
 		\proxyspace, currentEnvironment,
 		\releaseHolder, `(IdentityDictionary.new),
-		#[isRest, gt, t_trig], Pfunc { |ev|
+		#[gt, t_trig], Pfunc { |ev|
+			var gt = ev[\gt] ?? { 1 };
 			[
-				rest or: { ev.isRest ?? { false } },
-				ev[\gt] ?? { 1 },
+				if(rest or: { ev.isRest ?? { false } })
+				{ Rest(gt) } { gt },
 				ev[\t_trig] ?? { 1 }
 			]
-		}
+		},
 	).buildForProxy(proxy, channelOffset, index)
 };
 
