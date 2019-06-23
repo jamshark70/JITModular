@@ -1,4 +1,5 @@
 JITModPatch {
+	classvar <current;
 	var <name;
 	var <>proxyspace, <>server, <>buffers, <>midi, <customInit, <cleanup;
 	var <>doc, gui;
@@ -59,7 +60,9 @@ JITModPatch {
 	}
 
 	initDoc { |string("")|
-		doc = Document.new(this.docTitle, string, envir: proxyspace);
+		doc = Document.new(this.docTitle, string, envir: proxyspace)
+		.toFrontAction_({ current = this })
+		.endFrontAction_({ current = nil });
 		// seems we need a little time for string/envir to sync up
 		AppClock.sched(0.5, { doc.front });
 	}
