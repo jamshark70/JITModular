@@ -62,7 +62,12 @@ JITModPatch {
 	initDoc { |string("")|
 		doc = Document.new(this.docTitle, string, envir: proxyspace)
 		.toFrontAction_({ current = this })
-		.endFrontAction_({ current = nil });
+		.endFrontAction_({
+			// NOTE: This doesn't really work for pattern NodeProxies yet
+			if(this.class.loadingPatch !== this) {
+				current = nil
+			};
+		});
 		// seems we need a little time for string/envir to sync up
 		AppClock.sched(0.5, { doc.front });
 	}
@@ -149,6 +154,15 @@ JITModPatch {
 		}.fork(AppClock);
 	}
 
+	*loadingPatch { ^Library.at(\JITModPatch, \nowLoading) }
+	*loadingPatch_ { |patch|
+		if(patch.debug("set loadingPatch").notNil) {
+			Library.put(\JITModPatch, \nowLoading, patch)
+		} {
+			Library.global.removeEmptyAt(\JITModPatch, \nowLoading);
+		};
+	}
+
 	*load { |path|
 		var new = this.new(loading: true);
 		if(path.notNil) {
@@ -173,17 +187,18 @@ JITModPatch {
 					ctl.remove;
 					cond.unhang;
 				});
-				Library.put(\JITModPatch, \nowLoading, this);
+				this.class.loadingPatch = this;
 				protect {
 					this.clear;
 					cond.hang;
 					code = file.readAllString;
 					saveExecutingPath = thisProcess.nowExecutingPath;
+					current = this;
 					thisProcess.nowExecutingPath = p;
 					archive = code.interpret;
 					this.initFromArchive(archive);
 				} { |error|
-					Library.global.removeEmptyAt(\JITModPatch, \nowLoading);
+					this.class.loadingPatch = nil;
 					thisProcess.nowExecutingPath = saveExecutingPath;
 					file.close;
 					defer {  // defer to allow error to clear before handling
