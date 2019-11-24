@@ -62,12 +62,13 @@ JITModPatch {
 	initDoc { |string("")|
 		doc = Document.new(this.docTitle, string, envir: proxyspace)
 		.toFrontAction_({ current = this })
-		.endFrontAction_({
-			// NOTE: This doesn't really work for pattern NodeProxies yet
-			if(this.class.loadingPatch !== this) {
-				current = nil
-			};
-		});
+		// .endFrontAction_({
+		// 	// NOTE: This doesn't really work for pattern NodeProxies yet
+		// 	if(this.class.loadingPatch !== this) {
+		// 		current = nil
+		// 	};
+		// })
+		;
 		// seems we need a little time for string/envir to sync up
 		AppClock.sched(0.5, { doc.front });
 	}
@@ -149,6 +150,7 @@ JITModPatch {
 			buffers.clear;
 			midi.free;
 			doc.tryPerform(\close);  // may not have been initialized, if loading
+			if(current === this) { current = nil };
 			// gui.close; gui = nil;
 			this.changed(\didFree);
 		}.fork(AppClock);
