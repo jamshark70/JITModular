@@ -22,7 +22,7 @@
 				rateConstraint = proxy.rate;
 			};
 			^defClass.new(
-				SystemSynthDefs.tempNamePrefix ++ proxy.generateUniqueName ++ index,
+				SystemSynthDefs.tempNamePrefix ++ proxy.generateUniqueName ++ UniqueID.next,
 				this.prepareForProxySynthDef(proxy, channelOffset),
 				proxy.nodeMap.ratesFor(argNames),
 				nil,
