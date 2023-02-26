@@ -143,10 +143,11 @@ JMMIDI_OSCBridge {
 							name = mfunc[\name];
 							value = block { |break|
 								patch.proxyspace.keysValuesDo { |key, proxy|
-									if(proxy.nodeMap[name].notNil) {
+									if(proxy.nodeMap[name].isNumber) {
 										break.(proxy.nodeMap[name]);
 									};
 								};
+								nil
 							};
 							if(value.notNil) {
 								// note: profile spec is for OSC-side range, not OK here
