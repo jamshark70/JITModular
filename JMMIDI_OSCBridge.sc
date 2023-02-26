@@ -158,7 +158,7 @@ JMMIDI_OSCBridge {
 						};
 					};
 				};
-			}, dt: 0.1, name: this.class.name.asString, clock: AppClock);
+			}, dt: 0.15, name: this.class.name.asString, clock: AppClock);
 		};
 	}
 
