@@ -514,13 +514,15 @@ JITModPatchGui {
 			psGui = ProxyMixer(model.proxyspace, 12, psGuiView, Rect(0, 0, 1090, 275));
 		};
 		saveButton.states_([["save 保存"]])
-		.action_({ model.save(model.path) });  // model.path may be nil; gives file dialog
+		.action_({ { model.save(model.path) }.defer(0.1) });  // model.path may be nil; gives file dialog
 		saveAsButton.states_([["save as 另存为"]])
-		.action_({ model.save(nil) });
+		.action_({ { model.save(nil) }.defer(0.1) });
 		loadButton.states_([["load 打开"]])
 		.action_({
-			FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
-				path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
+			{
+				FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
+					path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
+			}.defer(0.1)
 		});
 		clearButton.states_([["quit 关闭"]])
 		.action_({
@@ -533,12 +535,12 @@ JITModPatchGui {
 						Button().states_([["save 保存"]])
 						.action_({
 							saveWin.close;
-							this.prSave(model.path, { model.clear });
+							{ this.prSave(model.path, { model.clear }); }.defer(0.1)
 						}),
 						Button().states_([["save as 另存为"]])
 						.action_({
 							saveWin.close;
-							this.prSave(nil, { model.clear });
+							{ this.prSave(nil, { model.clear }); }.defer(0.1)
 						}),
 						Button().states_([["discard 抛弃"]])
 						.action_({ saveWin.close; model.clear }),
@@ -1118,9 +1120,11 @@ JMBufferView : SCViewHolder {
 					win.close;
 					if(key.size > 0) {
 						path = this.findPath;
-						Dialog.openPanel({ |p|
-							model.readBuf(key.asSymbol, p);
-						}, path: path);
+						{
+							Dialog.openPanel({ |p|
+								model.readBuf(key.asSymbol, p);
+							}, path: path);
+						}.defer(0.1)
 					}
 				})
 			);
@@ -1128,9 +1132,11 @@ JMBufferView : SCViewHolder {
 		replaceButton.states_([["replace 代替"]]).action_({
 			var item = this.currentItem,
 			path = this.findPath;
-			Dialog.openPanel({ |p|
-				model.readBuf(item[0], p);  // same key
-			}, path: path);
+			{
+				Dialog.openPanel({ |p|
+					model.readBuf(item[0], p);  // same key
+				}, path: path);
+			}.defer(0.1);
 		});
 		deleteButton.states_([["delete 删除"]]).action_({
 			var win, item = this.currentItem;
