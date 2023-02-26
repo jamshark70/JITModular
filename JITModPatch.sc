@@ -375,6 +375,11 @@ JITModPatch {
 		midi.removeCtl(num, name);
 	}
 
+	// OSC-MIDI bridge
+	midiOSCBridge { |profile = \openstage|
+		^JMMIDI_OSCBridge(this, profile)
+	}
+
 	// buffers
 	readBuf { |name, path, startFrame = 0, numFrames = -1, action|
 		var buf = JMBuf(server),

@@ -7,7 +7,7 @@ JMMIDI {
 		if(MIDIClient.initialized.not) {
 			MIDIIn.connectAll;
 		};
-		^super.new.init(proxyspace, channel)
+		^super.new.init(proxyspace, nil, channel)
 	}
 
 	*newByName { |proxyspace, device(""), name(""), channel|
@@ -99,7 +99,9 @@ JMMIDI {
 			"Adding CC% for %\n".postf(num, name);
 			this.addCtl(num, name, spec);
 			learnFunc.free;
+			this.changed(\learned, num, name);
 		}, srcID: uid);
+		this.changed(\learning, name, spec);
 	}
 
 	addCtl { |num, name, spec|
