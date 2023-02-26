@@ -50,7 +50,7 @@
 			var rate;
 			// value = value.asControlInput;
 			rate = if(value.rate == \audio) { \audio } { \control };
-			res = res.add(ControlName(key, nil, rate, value))
+			res = res.add(ControlName(key, nil, rate, value.asControlInput))
 		};
 		^res
 	}
