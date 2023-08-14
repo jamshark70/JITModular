@@ -3,13 +3,21 @@ Event.addEventType(\psSet, {
 	sustain = ~sustain.value,
 	releaseHolder = ~releaseHolder,
 	skipArgs = IdentitySet.with(\gate, \fadeTime, \out).addAll(~skipArgs);
+	var checkName;
+
+	if(~setArgs.notNil) {
+		checkName = { |cname| ~setArgs.includes(cname) }
+	} {
+		checkName = { |cname| skipArgs.includes(cname).not }
+	};
+
 	~freq = ~detunedFreq.value;
 	~amp = ~amp.value;
 	~proxyspace.keysValuesDo { |name, proxy|
 		var ctl = proxy.objects[0];
 		case  // most specific cases (ScalarSynthControl) should come first
 		{ ctl.isKindOf(StreamControl) and: { ctl.source.isNumber } } {
-			if(skipArgs.includes(name.asSymbol).not and: { (value = name.envirGet).notNil }) {
+			if(checkName.(name.asSymbol) and: { (value = name.envirGet).notNil }) {
 				proxy.source = value;
 				if(name == \gt and: { sustain.notNil and: { sustain < inf } }) {
 					if(releaseHolder.notNil) {
@@ -26,12 +34,15 @@ Event.addEventType(\psSet, {
 		{ ctl.isKindOf(SynthControl) } {
 			proxy.controlNames.do { |cn|
 				var cname = cn.name.asSymbol;
-				if(skipArgs.includes(cname).not and: {  // if... don't skip me
+				if(checkName.(cname) and: {  // if... don't skip me
 					proxy.nodeMap[cname].isKindOf(BusPlug).not and: {  // and I'm not mapped to a proxy
 						(value = cname.envirGet).notNil  // and I have a value
 					}
 				}) {
-					proxy.set(cn.name, value);
+					// prevent infinite loops by not 'set'-ting to the same value
+					if(value != proxy.nodeMap[cname]) {
+						proxy.set(cn.name, value);
+					};
 					if(cn.name == \gt and: { sustain.notNil and: { sustain < inf } }) {
 						if(releaseHolder.notNil) {
 							releaseHolder[proxy] = thisThread.beats + sustain;
