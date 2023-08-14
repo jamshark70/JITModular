@@ -79,17 +79,19 @@ JITModPatch {
 			var key = proxyspace.use { proxy.key },
 			setFunc = { |obj, what, args|
 				var pairs = Array(args.size);
-				args.pairsDo { |key, value|
-					if(value.isKindOf(BusPlug)) {
-						pairs.add(key).add(value);
-					};
-				};
-				if(pairs.size > 0) {
-					// send only mappings, not setting fixed values
+				// args.pairsDo { |key, value|
+				// 	if(value.isKindOf(BusPlug)) {
+				// 		pairs.add(key).add(value);
+				// 	};
+				// };
+				// if(pairs.size > 0) {
+					// OLD: send only mappings, not setting fixed values
 					// because this is for the connection view
 					// NdefGui polls for value changes
-					this.changed(\setMapping, args)
-				};
+				// NEW: respond to fixed values too
+				// to update same-name parameters in other proxies
+					this.changed(\setMapping, args);
+				// };
 				if(dirty.not) {
 					this.dirty = true;  // but changing anything dirties the state
 				};
@@ -445,6 +447,69 @@ JITModPatch {
 	freeBuf { |name|
 		buffers.removeAt(name);
 	}
+
+	// event support
+	setEvent { |event| ^proxyspace.setEvent(event) }
+
+	getConnections {
+		// This is not modularized at all because I'm lazy
+		var chains = Array.new,
+		findChain = { |conn|
+			chains.detect { |chain|
+				conn.canConnect(chain.first)
+				or: {
+					chain.last.canConnect(conn)
+				}
+			};
+		},
+		// problem: cleaning 'c' array (we are iterating over it)
+		scanLinks = {
+			(1 .. chains.size - 1).do { |i|  // 1, 2, 3...
+				if(chains[i].notNil) {
+					block { |break|
+						i.do { |j|  // 0, 1 .. i-1
+							if(chains[j].notNil) {
+								if(chains[j].last.canConnect(chains[i].first)) {
+									// c[i] goes to end of c[j]
+									chains[i].do { |conn| chains[j].add(conn) };
+									chains[i] = nil;
+									break.();
+								} {
+									if(chains[i].last.canConnect(chains[j].first)) {
+										// c[i] goes to head of c[j]
+										chains[i].reverseDo { |conn| chains[j].addFirst(conn) };
+										chains[i] = nil;
+										break.();
+									}
+								};
+							};
+						};
+					};
+				};
+			};
+			chains = chains.reject(_.isNil);
+		};
+		proxyspace.keysValuesDo { |key, proxy|
+			var conn, chain;
+			proxy.nodeMap.keysValuesDo { |key, src|
+				if(src.isKindOf(BusPlug)) {
+					conn = JITModConnection(src, proxy, key);
+					chain = findChain.(conn);
+					if(chain.notNil) {
+						if(chain.last.canConnect(conn)) {
+							chain.add(conn);
+						} {
+							chain.addFirst(conn);
+						};
+						scanLinks.();
+					} {
+						chains = chains.add(LinkedList.new.addFirst(conn));
+					};
+				};
+			};
+		};
+		^chains
+	}
 }
 
 JITModPatchGui {
@@ -563,7 +628,7 @@ JITModPatchGui {
 		.put(\dirty, { |obj, what, bool|
 			defer { saveButton.enabled = bool };
 		})
-		.put(\setMapping, { |args| this.updateConn(args) })
+		.put(\setMapping, { |obj, what, args| this.updateParams(args) })
 		.put(\name, { |obj, what, name|
 			if(window.notNil) {
 				defer {
@@ -614,69 +679,26 @@ JITModPatchGui {
 		if(window.notNil) { window.close };
 	}
 
+	updateParams { |args|
+		var mapChanged = false;
+		var event = model.setEvent.put(\gt, nil).put(\t_trig, nil);
+		var setKeys = IdentitySet.new;
+		args.pairsDo { |key, value|
+			if(value.isKindOf(BusPlug)) {
+				mapChanged = true;
+			} {
+				setKeys.add(key);
+				event.put(key, value);
+			};
+		};
+		if(setKeys.notEmpty) { event.put(\setArgs, setKeys).play };
+		if(mapChanged) { this.updateConn };
+	}
+
 	updateConn {
-		// This is not modularized at all because I'm lazy
-		var chains = Array.new, out = CollStream.new,
-		makeConn = { |src, target, name|
-			(src: src, target: target, name: name, srcRate: src.rate)
-		},
-		canConnect = { |a, b|
-			a.srcRate == b.srcRate and: { a.target === b.src }
-		},
-		findChain = { |conn|
-			chains.detect { |chain|
-				canConnect.(conn, chain.first)
-				or: {
-					canConnect.(chain.last, conn)
-				}
-			};
-		},
-		// problem: cleaning 'c' array (we are iterating over it)
-		scanLinks = {
-			(1 .. chains.size - 1).do { |i|  // 1, 2, 3...
-				if(chains[i].notNil) {
-					block { |break|
-						i.do { |j|  // 0, 1 .. i-1
-							if(chains[j].notNil) {
-								if(canConnect.(chains[j].last, chains[i].first)) {
-									// c[i] goes to end of c[j]
-									chains[i].do { |conn| chains[j].add(conn) };
-									chains[i] = nil;
-									break.();
-								} {
-									if(canConnect.(chains[i].last, chains[j].first)) {
-										// c[i] goes to head of c[j]
-										chains[i].reverseDo { |conn| chains[j].addFirst(conn) };
-										chains[i] = nil;
-										break.();
-									}
-								};
-							};
-						};
-					};
-				};
-			};
-			chains = chains.reject(_.isNil);
-		};
-		model.proxyspace.keysValuesDo { |key, proxy|
-			var conn, chain;
-			proxy.nodeMap.keysValuesDo { |key, src|
-				if(src.isKindOf(BusPlug)) {
-					conn = makeConn.(src, proxy, key);
-					chain = findChain.(conn);
-					if(chain.notNil) {
-						if(canConnect.(chain.last, conn)) {
-							chain.add(conn);
-						} {
-							chain.addFirst(conn);
-						};
-						scanLinks.();
-					} {
-						chains = chains.add(LinkedList.new.addFirst(conn));
-					};
-				};
-			};
-		};
+		var chains = model.getConnections;
+		var out = CollStream.new;
+		// 'use' is required for asCompileString
 		model.proxyspace.use {
 			chains.do { |chain|
 				out << chain.first.src.asCompileString;
@@ -691,6 +713,17 @@ JITModPatchGui {
 			};
 		};
 		defer { connView.string = out.collection };
+	}
+}
+
+JITModConnection {
+	// (src: src, target: target, name: name, srcRate: src.rate)
+	var <>src, <>target, <>name, <>srcRate;
+	*new { |src, target, name|
+		^super.newCopyArgs(src, target, name, src.rate)
+	}
+	canConnect { |that|
+		^(srcRate == that.srcRate and: { target === that.src })
 	}
 }
 
