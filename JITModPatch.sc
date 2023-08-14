@@ -30,6 +30,8 @@ JITModPatch {
 		NotificationCenter.registerOneShot(this, \ready, \init, {
 			server.waitForBoot {  // just to be sure
 				proxyspace = StereoProxySpace(server, name);
+				proxyspace.put(\out, #{ JMInput.ar });
+				proxyspace.at(\out).play(vol: 0.2);
 				buffers = JMBufferSet(this);
 				this.initDoc;
 				this.initController;
@@ -59,7 +61,7 @@ JITModPatch {
 		this.dirty = false;  // loader will override this
 	}
 
-	initDoc { |string("")|
+	initDoc { |string("~out = #{ JMInput.ar }; ~out.play(vol: 0.2);\n\n")|
 		doc = Document.new(this.docTitle, string, envir: proxyspace)
 		.toFrontAction_({ current = this })
 		// .endFrontAction_({
