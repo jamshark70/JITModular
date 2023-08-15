@@ -683,7 +683,9 @@ JITModPatchGui {
 
 	updateParams { |args|
 		var mapChanged = false;
-		var event = model.setEvent.put(\gt, nil).put(\t_trig, nil);
+		var event = model.setEvent
+		.put(\gt, nil).put(\t_trig, nil)
+		.put(\sustain, inf);  // otherwise, set/reset/set/reset gate
 		var setKeys = IdentitySet.new;
 		args.pairsDo { |key, value|
 			if(value.isKindOf(BusPlug)) {
