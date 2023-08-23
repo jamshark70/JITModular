@@ -102,8 +102,17 @@ JITModPatch {
 			controllers[key] = SimpleController(proxy)
 			.put(\source, { this.dirty = true })
 			.put(\set, setFunc)
-			.put(\map, setFunc);
-			// .put(\clear, { ... remove ctl? ... })
+			.put(\map, setFunc)
+			// workaround for a bug in Halo:
+			// Halo clobbers my SimpleController upon .clear
+			// so I have to put it back
+			.put(\clear, {
+				{
+					if(proxy.dependants.includes(controllers[key]).not) {
+						proxy.addDependant(controllers[key]);
+					}
+				}.defer(0.1);
+			});
 			// per NodeProxy:xfadePerform, it appears that the \map or \set notification
 			// may come from either the nodeproxy or the nodemap...???
 			controllers[(key ++ "_nodeMap").asSymbol].remove;
