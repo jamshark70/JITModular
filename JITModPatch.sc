@@ -80,23 +80,9 @@ JITModPatch {
 			// we might not be in the environment at this point
 			var key = proxyspace.use { proxy.key },
 			setFunc = { |obj, what, args|
-				var pairs = Array(args.size);
-				// args.pairsDo { |key, value|
-				// 	if(value.isKindOf(BusPlug)) {
-				// 		pairs.add(key).add(value);
-				// 	};
-				// };
-				// if(pairs.size > 0) {
-					// OLD: send only mappings, not setting fixed values
-					// because this is for the connection view
-					// NdefGui polls for value changes
 				// NEW: respond to fixed values too
 				// to update same-name parameters in other proxies
-					this.changed(\setMapping, args);
-				// };
-				if(dirty.not) {
-					this.dirty = true;  // but changing anything dirties the state
-				};
+				this.proxyDidSet(obj, args);
 			};
 			controllers[key].remove;  // if anything was there before, drop it now
 			controllers[key] = SimpleController(proxy)
@@ -346,6 +332,38 @@ JITModPatch {
 	dirty_ { |bool|
 		dirty = bool;
 		this.changed(\dirty, bool);
+	}
+
+	// updates
+	proxyDidSet { |obj, args|
+		var mapChanged = false;
+		var event = this.setEvent
+		.put(\gt, nil).put(\t_trig, nil)
+		.put(\sustain, inf);  // otherwise, set/reset/set/reset gate
+		var setKeys = IdentitySet.new;
+		args.pairsDo { |key, value|
+			// if we're 'set'ting to a BusPlug,
+			// then the connections have changed
+			if(value.isKindOf(BusPlug)) {
+				mapChanged = true;
+			} {
+				// if we're 'set'ting to a non-busplug,
+				// but it was previously mapped to a busplug,
+				// then the connections have changed
+				if(obj.nodeMap[key].isKindOf(BusPlug)) {
+					mapChanged = true;
+				};
+				setKeys.add(key);
+				event.put(key, value);
+			};
+		};
+		if(setKeys.notEmpty) { event.put(\setArgs, setKeys).play };
+
+		if(mapChanged) { this.changed(\setMapping, args) };
+
+		if(dirty.not) {
+			this.dirty = true;  // but changing anything dirties the state
+		};
 	}
 
 	// proxyspace access
@@ -639,7 +657,7 @@ JITModPatchGui {
 		.put(\dirty, { |obj, what, bool|
 			defer { saveButton.enabled = bool };
 		})
-		.put(\setMapping, { |obj, what, args| this.updateParams(args) })
+		.put(\setMapping, { |obj, what, args| this.updateConn })
 		.put(\name, { |obj, what, name|
 			if(window.notNil) {
 				defer {
@@ -690,23 +708,8 @@ JITModPatchGui {
 		if(window.notNil) { window.close };
 	}
 
-	updateParams { |args|
-		var mapChanged = false;
-		var event = model.setEvent
-		.put(\gt, nil).put(\t_trig, nil)
-		.put(\sustain, inf);  // otherwise, set/reset/set/reset gate
-		var setKeys = IdentitySet.new;
-		args.pairsDo { |key, value|
-			if(value.isKindOf(BusPlug)) {
-				mapChanged = true;
-			} {
-				setKeys.add(key);
-				event.put(key, value);
-			};
-		};
-		if(setKeys.notEmpty) { event.put(\setArgs, setKeys).play };
-		if(mapChanged) { this.updateConn };
-	}
+	// updateParams { |args|
+	// }
 
 	updateConn {
 		var chains = model.getConnections;
