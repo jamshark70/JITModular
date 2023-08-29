@@ -246,3 +246,10 @@ StereoProxySpace : ProxySpace {
 		^proxy
 	}
 }
+
+// for disconnection
++ Nil {
+	<>> { |target, adverb = \in|
+		target.set(\in, 0);  // JITModPatch has logic to break the connection
+	}
+}
