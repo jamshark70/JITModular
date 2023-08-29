@@ -168,10 +168,24 @@
 
 		var isAnon, isSingle, isInCurrent, isOnDefault, isMultiline;
 
+		var hasDefaultNumChannels;
+
 		envir = envir ? currentEnvironment;
 
 		nameStr = envir.use { this.asCompileString };
 		indexStr = nameStr;
+
+		if(this.isKindOf(StereoNodeProxy)) {
+			if(this.rate == \audio and: {
+				(this.numChannels != 2)
+			}) {
+				hasDefaultNumChannels = false;
+			} {
+				hasDefaultNumChannels = true;
+			};
+		} {
+			hasDefaultNumChannels = true;
+		};
 
 		isAnon = nameStr.beginsWith("a = ");
 		isSingle = this.objects.isEmpty or: { this.objects.size == 1 and: { this.objects.indices.first == 0 } };
@@ -189,6 +203,11 @@
 		docStr = String.streamContents { |stream|
 			if(includeSettings and: { this.quant.notNil }) {
 				stream <<< this << ".quant = " <<< quant << ";\n";
+			};
+
+			if(hasDefaultNumChannels.not) {
+				stream << nameStr << "." << UGen.methodSelectorForRate(this.rate)
+				<< "(" << this.numChannels << ");\n";
 			};
 
 			if(isSingle) {
