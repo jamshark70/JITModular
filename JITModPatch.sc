@@ -6,6 +6,11 @@ JITModPatch {
 	var <path;
 	var <dirty = false;  // I'm not sure I can really support this?
 
+	// sometimes I need to check the old value before it was set
+	// but it's changed before we get any notifications here
+	// I can't think of any way except to mirror every NodeMap
+	var nodeMapMirrors;
+
 	var controllers;  // track changes in proxyspace
 
 	*initClass {
@@ -84,6 +89,7 @@ JITModPatch {
 				// to update same-name parameters in other proxies
 				this.proxyDidSet(obj, args);
 			};
+
 			controllers[key].remove;  // if anything was there before, drop it now
 			controllers[key] = SimpleController(proxy)
 			.put(\source, { this.dirty = true })
@@ -93,6 +99,9 @@ JITModPatch {
 			// Halo clobbers my SimpleController upon .clear
 			// so I have to put it back
 			.put(\clear, {
+				// actually this is probably wrong:
+				// NodeProxy:clear doesn't wipe out the NodeMap
+				// nodeMapMirrors[key].clear;  // maybe?
 				{
 					if(proxy.dependants.includes(controllers[key]).not) {
 						proxy.addDependant(controllers[key]);
@@ -106,6 +115,16 @@ JITModPatch {
 			.put(\set, setFunc)
 			.put(\map, setFunc);
 		};
+
+		nodeMapMirrors = IdentityDictionary.new;
+		// when init-ing from archive, the 'set' statements
+		// have already run and nodeMaps are already populated,
+		// so, copy them
+		proxyspace.keysValuesDo { |key, proxy|
+			nodeMapMirrors[key] = IdentityDictionary.new
+			.putAll(proxy.nodeMap);
+		};
+
 		if(controllers.isNil) {
 			controllers = IdentityDictionary.new
 		} {
@@ -113,6 +132,10 @@ JITModPatch {
 		};
 		controllers[\proxyspace] = SimpleController(proxyspace)
 		.put(\newProxy, { |obj, what, proxy, loading|
+			var key = proxyspace.findKeyForValue(proxy);
+			if(nodeMapMirrors[key].isNil) {  // shouldn't that always be true?
+				nodeMapMirrors[key] = IdentityDictionary.new;
+			};
 			makeCtl.(proxy);
 			// if we are in the process of loading a patch, don't set 'dirty'
 			if(loading.isNil) {
@@ -336,11 +359,13 @@ JITModPatch {
 
 	// updates
 	proxyDidSet { |obj, args|
-		var mapChanged = false;
+		var mapChanged = false, src;
 		var event = this.setEvent
 		.put(\gt, nil).put(\t_trig, nil)
 		.put(\sustain, inf);  // otherwise, set/reset/set/reset gate
 		var setKeys = IdentitySet.new;
+		var proxyKey = proxyspace.findKeyForValue(obj);
+		var oldNodeMap = nodeMapMirrors[proxyKey];
 		args.pairsDo { |key, value|
 			// if we're 'set'ting to a BusPlug,
 			// then the connections have changed
@@ -350,8 +375,13 @@ JITModPatch {
 				// if we're 'set'ting to a non-busplug,
 				// but it was previously mapped to a busplug,
 				// then the connections have changed
-				if(obj.nodeMap[key].isKindOf(BusPlug)) {
+				src = oldNodeMap[key];
+				if(src.isKindOf(BusPlug)) {
 					mapChanged = true;
+					// also make sure to remove *all* channels
+					if(src.numChannels > 1) {
+						value = value.asArray.wrapExtend(src.numChannels);
+					};
 				};
 				setKeys.add(key);
 				event.put(key, value);
