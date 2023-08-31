@@ -180,7 +180,7 @@ JITModPatch {
 
 	*loadingPatch { ^Library.at(\JITModPatch, \nowLoading) }
 	*loadingPatch_ { |patch|
-		if(patch.debug("set loadingPatch").notNil) {
+		if(patch.notNil) {
 			Library.put(\JITModPatch, \nowLoading, patch)
 		} {
 			Library.global.removeEmptyAt(\JITModPatch, \nowLoading);
