@@ -366,30 +366,32 @@ JITModPatch {
 		var setKeys = IdentitySet.new;
 		var proxyKey = proxyspace.findKeyForValue(obj);
 		var oldNodeMap = nodeMapMirrors[proxyKey];
-		args.pairsDo { |key, value|
-			// if we're 'set'ting to a BusPlug,
-			// then the connections have changed
-			if(value.isKindOf(BusPlug)) {
-				mapChanged = true;
-			} {
-				// if we're 'set'ting to a non-busplug,
-				// but it was previously mapped to a busplug,
+		if(proxyKey.notNil) {
+			args.pairsDo { |key, value|
+				// if we're 'set'ting to a BusPlug,
 				// then the connections have changed
-				src = oldNodeMap[key];
-				if(src.isKindOf(BusPlug)) {
+				if(value.isKindOf(BusPlug)) {
 					mapChanged = true;
-					// also make sure to remove *all* channels
-					if(src.numChannels > 1) {
-						value = value.asArray.wrapExtend(src.numChannels);
+				} {
+					// if we're 'set'ting to a non-busplug,
+					// but it was previously mapped to a busplug,
+					// then the connections have changed
+					src = oldNodeMap[key];
+					if(src.isKindOf(BusPlug)) {
+						mapChanged = true;
+						// also make sure to remove *all* channels
+						if(src.numChannels > 1) {
+							value = value.asArray.wrapExtend(src.numChannels);
+						};
 					};
+					setKeys.add(key);
+					event.put(key, value);
 				};
-				setKeys.add(key);
-				event.put(key, value);
 			};
+			if(setKeys.notEmpty) { event.put(\setArgs, setKeys).play };
 		};
-		if(setKeys.notEmpty) { event.put(\setArgs, setKeys).play };
 
-		if(mapChanged) { this.changed(\setMapping, args) };
+		if(mapChanged or: { proxyKey.isNil }) { this.changed(\setMapping, args) };
 
 		if(dirty.not) {
 			this.dirty = true;  // but changing anything dirties the state
