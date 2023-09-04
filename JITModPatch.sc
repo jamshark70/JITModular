@@ -656,7 +656,7 @@ JITModPatchGui {
 					path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 			}.defer(0.1)
 		});
-		synthdefButton.states_([["synthdef"]])
+		synthdefButton.states_([["SynthDef"]])
 		.action_({
 			var str = CollStream.new;
 			var doc, name;
