@@ -577,7 +577,7 @@ JITModPatchGui {
 	var <model,
 	<view, window,
 	psGuiView, psGui,
-	saveButton, saveAsButton, loadButton, clearButton,
+	saveButton, saveAsButton, loadButton, synthdefButton, clearButton,
 	midiButton, bufButton,
 	stack,
 	bufferView,  // not yet
@@ -632,6 +632,7 @@ JITModPatchGui {
 						saveButton = Button().fixedWidth_(90),
 						saveAsButton = Button().fixedWidth_(105),
 						loadButton = Button().fixedWidth_(90),
+						synthdefButton = Button().fixedWidth_(90),
 						clearButton = Button().fixedWidth_(90),
 						nil,
 					),
@@ -654,6 +655,22 @@ JITModPatchGui {
 				FileDialog({ |path| model.load(path) }, fileMode: 1, acceptMode: 0, stripResult: true,
 					path: Archive.at(\JITModPatch, \lastPath).tryPerform(\dirname));
 			}.defer(0.1)
+		});
+		synthdefButton.states_([["synthdef"]])
+		.action_({
+			var str = CollStream.new;
+			var doc, name;
+			JMDecompiler(model).streamCode(str);
+			// either success, or threw an error, so we press forward
+			{
+				doc = Document.new;
+				0.5.wait;
+				name = model.name ?? { "JITModPatch as synthdef" };
+				str = "(\nSynthDef('" ++ name.escapeChar($') ++ "', { |out|\n"
+				++ str.collection  // has trailing \n
+				++ "\tOut.ar(out, outOut);\n}).add;\n)\n";
+				doc.title_(name).string_(str);
+			}.fork(AppClock);
 		});
 		clearButton.states_([["quit 关闭"]])
 		.action_({
