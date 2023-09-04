@@ -192,29 +192,27 @@
 
 + AudioControl {
 	streamCode { |key, stream, decomp|
-		var name, i;
-		if(channels.size > 1) {
-			stream << "[";
+		var name, i, io, cname;
+		stream << "NamedControl.ar(";
+		io = decomp.proxyIO[key];
+		cname = io.controlUGens[this];
+		// JMInput should have just one name;
+		// maybe have to fix this later for a_ args
+		if(cname.isNil) {
+			Error("No ControlName available for AudioControl").throw;
 		};
-		channels.do { |chan, i|
-			if(i > 0) { stream << ", " };
-			stream << decomp.outputProxies[chan].string; //.asString(chan);
-		};
-		if(channels.size > 1) {
-			stream << "]";
-		};
-		// hack hack hack
-		name = decomp.outputProxies[channels[0]].string;  // .asString(channels[0]);
-		i = name.tryPerform(\findAll, "Out");
-		if(i.notNil) {
-			stream << " /* " << name[ .. i.last - 1] << " --> AudioControl */";
-		};
+		stream << "'" << key << "_" << cname[0].name
+		<< "', " <<< cname[0].defaultValue;
+		stream << ")";
 	}
 
 	decompilerCanOptimizeOut { |key, decomp|
 		var io = decomp.proxyIO[key];
 		^channels.every { |chan|
-			io.channelSources[chan].notNil
+			var self;
+			io.channelSources[chan].notNil and: {
+				(key ++ "_" ++ chan.synthIndex) != io.channelSources[chan].baseString
+			}
 		};
 	}
 }
