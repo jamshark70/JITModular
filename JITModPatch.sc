@@ -387,6 +387,7 @@ JITModPatch {
 					setKeys.add(key);
 					event.put(key, value);
 				};
+				oldNodeMap.put(key, value);
 			};
 			if(setKeys.notEmpty) { event.put(\setArgs, setKeys).play };
 		};
