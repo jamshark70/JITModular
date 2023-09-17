@@ -252,11 +252,13 @@
 	}
 
 	decompilerCanOptimizeOut { |key, decomp|
-		var io = decomp.proxyIO[key];
+		// var io = decomp.proxyIO[key];
 		// "free-standing In units do not get JMMapStrings"
 		// so, if all are accounted for, then optimization is allowed
+		// LocalIn channels get added into decomp, but not proxyIO
+		// this might be a bug but I won't fix it today
 		^channels.every { |pr|
-			io.channelSources[pr].notNil
+			decomp.outputProxies[pr].notNil
 		};
 	}
 }
