@@ -158,6 +158,7 @@
 	getPairs { |key, decomp|
 		var io = decomp.proxyIO[key];
 		var cnames, out, index;
+		var nodemap;
 
 		out = io.controlPairs[this];
 		if(out.notNil) { ^out };
@@ -168,13 +169,20 @@
 		// it "should" be OK because the ControlName objects in 'controls' and 'controlUGens'
 		// are pulled directly from the real synthdef
 		index = io.controls.detectIndex { |assn| assn.key == cnames[0] };
+		nodemap = decomp.proxyspace[key].nodeMap;
 
 		// keep names and default values only for \renderControl channels
 		cnames.do { |cn, j|
+			var value;
 			if(io.controls[index].value.any { |outputproxy|
 				io.channelSources[outputproxy].hasFlag(\renderControl)
 			}) {
-				out = out.add((cn.name -> cn.defaultValue));
+				if(nodemap.notNil) {  // should always be non-nil?
+					value = nodemap[cn.name] ?? { cn.defaultValue };
+				} {
+					value = cn.defaultValue;
+				};
+				out = out.add((cn.name -> value));
 			};
 			index = index + 1;
 		};
@@ -406,9 +414,16 @@
 		stream << ", ";
 		inputs[8].streamAsInputUGen(key, stream, decomp);
 		stream << ")";
-		5.do { |i|
+		4.do { |i|
 			stream << ", ";
 			inputs[i].streamAsInputUGen(key, stream, decomp);
+		};
+		stream << ", ";
+		// doneAction: assume ~eg is the main envelope
+		if(key == \eg) {
+			stream << "2"
+		} {
+			inputs[4].streamAsInputUGen(key, stream, decomp);
 		};
 		stream << ")";
 	}
