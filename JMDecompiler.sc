@@ -72,7 +72,7 @@ JMLocalMap {
 				JMMapString(
 					nil,  // channel but seems unused
 					i,
-					srcAssn.key ++ "Out"
+					"~" ++ srcAssn.key ++ "Out"
 				).setFlag(\multiChannel, size >= 2)
 			);
 		};
@@ -266,11 +266,13 @@ JMDecompiler {
 
 	streamCode { |argStream(Post)|
 		stream = argStream;
+		stream << "\tvar env = Environment.new;\n\tenv.use {\n";
 		localMap.streamLocalIn(stream);
 		nodeOrder.do { |key|
 			this.postUGens(key, stream);
 		};
 		localMap.streamLocalOut(stream);
+		stream << "\t};\n";
 	}
 
 	postUGens { |key, stream|
@@ -287,13 +289,13 @@ JMDecompiler {
 			(0 .. def.children.size - 6 - numOutputs).do { |i|
 				ugen = def.children[i];
 				if(ugen.decompilerCanOptimizeOut(key, this).not) {
-					stream << "\tvar " << key << "_" << i << " = ";
+					stream << "\t~" << key << "_" << i << " = ";
 					ugen.streamCode(key, stream, this);
 					stream << ";\n";
 				};
 			};
 			// the Out might expand mono to stereo, for instance
-			stream << "\tvar " << key << "Out" << " = ";
+			stream << "\t~" << key << "Out" << " = ";
 			ugen = def.children.last.inputs.drop(1);
 			if(ugen.size > 1) {
 				stream << "[";
@@ -310,7 +312,7 @@ JMDecompiler {
 				if(str.notNil) {
 					stream << str.string
 				} {
-					stream << key << "_" << chan.synthIndex;
+					stream << "~" << key << "_" << chan.synthIndex;
 					if(chan.isKindOf(OutputProxy)) {
 						if(chan.source.channels.size > 1) {
 							stream << "[" << chan.outputIndex << "]"
@@ -512,7 +514,7 @@ JMProxyIO {
 								// protect against multiChannel getting clobbered below
 								src.value.findOutputChannel(i),
 								i,
-								src.key ++ "Out"
+								"~" ++ src.key ++ "Out"
 							).setFlag(\multiChannel, src.value.numChannels >= 2);
 						};
 					};
@@ -546,7 +548,7 @@ JMProxyIO {
 				assn.value.do { |chan|
 					channelSources[chan] = JMMapString(
 						chan, (chan.outputIndex - indexOffset),
-						key ++ "_" ++ chan.source.synthIndex
+						"~" ++ key ++ "_" ++ chan.source.synthIndex
 					).setFlag(\renderControl);
 					if(numChannelsPerUGen[prevUGen].isNil) {
 						numChannelsPerUGen[prevUGen] = max(1, assn.value.size)
@@ -630,7 +632,7 @@ JMProxyIO {
 							channelSources[chan] = JMMapString(
 								chan,
 								j,
-								src.key ++ "Out"
+								"~" ++ src.key ++ "Out"
 							).setFlag(\multiChannel, src.value.numChannels >= 2);
 						};
 					};

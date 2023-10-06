@@ -21,7 +21,7 @@
 	}
 
 	streamAsInputUGen { |key, stream|
-		stream << key << "_" << this.synthIndex;
+		stream << "~" << key << "_" << this.synthIndex;
 	}
 
 	// assume we have to render it
@@ -36,7 +36,7 @@
 		if(str.notNil) {
 			stream << str.string;  // .asString(this);
 		} {
-			stream << key << "_" << this.source.synthIndex;
+			stream << "~" << key << "_" << this.source.synthIndex;
 			if(this.source.channels.size >= 2) {
 				stream << "[" << this.outputIndex << "]"
 			};

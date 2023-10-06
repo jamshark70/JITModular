@@ -669,7 +669,7 @@ JITModPatchGui {
 				name = model.name ?? { "JITModPatch as synthdef" };
 				str = "(\nSynthDef('" ++ name.escapeChar($') ++ "', { |out|\n"
 				++ str.collection  // has trailing \n
-				++ "\tOut.ar(out, outOut);\n}).add;\n)\n";
+				++ "\tOut.ar(out, env[\\outOut]);\n}).add;\n)\n";
 				doc.title_(name).string_(str);
 			}.fork(AppClock);
 		});
