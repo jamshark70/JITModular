@@ -579,6 +579,21 @@
 	}
 }
 
++ Duty {
+	streamCode { |key, stream, decomp|
+		this.streamNameAndRate(stream);
+		stream << "(";
+		inputs[0].streamAsInputUGen(key, stream, decomp);
+		stream << ", ";
+		inputs[1].streamAsInputUGen(key, stream, decomp);
+		stream << ", ";
+		inputs[3].streamAsInputUGen(key, stream, decomp);
+		stream << ", ";
+		inputs[2].streamAsInputUGen(key, stream, decomp);
+		stream << ")";
+	}
+}
+
 + DUGen {
 	streamNameAndRate { |stream|
 		stream << this.class.name
