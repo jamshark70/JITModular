@@ -326,7 +326,7 @@ JMDecompiler {
 			stream << ";\n";
 		}
 		{ #[noncontrol, scalar].includes(proxy.source.rate) } {
-			stream << "\tvar " << key << "Out = NamedControl."
+			stream << "\t~" << key << "Out = NamedControl."
 			<< UGen.methodSelectorForRate(proxy.rate)
 			<< "(" <<< key << ", ";
 			// note, there's no 'nodeMap' value for this type of proxy
