@@ -61,7 +61,7 @@ JITModPatch {
 		this.initDoc(archive[\string]);
 		this.initController;
 		if(midi.notNil) { this.initMidiCtl };
-		customInit.value(this);
+		proxyspace.use { customInit.value(this) };
 		JITModPatchGui(this);  // uses dependencies
 		this.dirty = false;  // loader will override this
 	}
