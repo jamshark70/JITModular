@@ -62,6 +62,12 @@ JMMIDI_OSCBridge {
 		// })
 		;
 
+		midi.midiFuncs.do { |midiResp|
+			if(#[noteOn, noteOff].includes(midiResp[\name]).not) {
+				this.addCtl(midiResp[\num].debug("osc addctl"), midiResp[\name].debug("name"), midiResp[\spec].debug("spec"));
+			};
+		};
+
 		func = { |msg, time, replyAddr|
 			var ctls = controls[msg[0]];
 			var spec = profile[msg[0]];
@@ -152,7 +158,9 @@ JMMIDI_OSCBridge {
 							if(value.notNil) {
 								// note: profile spec is for OSC-side range, not OK here
 								value = mfunc[\spec].unmap(value);
-								addr.sendMsg(path, value);
+								if(addr.notNil) {
+									addr.sendMsg(path, value);
+								};
 								midi.changed(\cc, mfunc[\num], (value * 127.0).round.asInteger);
 							};
 						};
