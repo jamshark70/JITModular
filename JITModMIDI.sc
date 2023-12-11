@@ -108,36 +108,42 @@ JMMIDI {
 		var key = this.key(num, name),
 		skip = [\freq, \midinote, \amp, \pan, \gt, \t_trig],
 		ctl;
-		skip.remove(name);
-		if(spec.isNil) {
-			block { |break|
-				proxyspace.keysValuesDo { |key, obj|
-					case
-					{ key == name and: { obj.source.isNumber } } {
-						spec = obj.getSpec('#');
-					}
-					{ obj.controlNames.detect { |cn| cn.name == name }.notNil } {
-						spec = obj.getSpec(name);
+		if(midiFuncs[key].isNil) {
+			skip.remove(name);
+			if(spec.isNil) {
+				block { |break|
+					proxyspace.keysValuesDo { |key, obj|
+						case
+						{ key == name and: { obj.source.isNumber } } {
+							spec = obj.getSpec('#');
+						}
+						{ obj.controlNames.detect { |cn| cn.name == name }.notNil } {
+							spec = obj.getSpec(name);
+						};
+						if(spec.notNil) { break.() };
 					};
-					if(spec.notNil) { break.() };
 				};
 			};
+			spec = spec.asSpec;
+			midiFuncs.put(key, (
+				name: name, num: num, spec: spec, skipArgs: skip,
+				resp: MIDIFunc.cc({ |val, num|
+					this.cc(key, val);
+				}, num, chan: channel, srcID: uid)
+			));
+			this.changed(\addCtl, num, name, spec);
+		} {
+			this.editCtl(num, name, spec);
 		};
-		spec = spec.asSpec;
-		midiFuncs.put(key, (
-			name: name, num: num, spec: spec, skipArgs: skip,
-			resp: MIDIFunc.cc({ |val, num|
-				this.cc(key, val);
-			}, num, chan: channel, srcID: uid)
-		));
-		this.changed(\addCtl, num, name, spec);
 	}
 
 	removeCtl { |num, name|
 		var key = this.key(num, name);
-		midiFuncs[key][\resp].free;
-		midiFuncs[key] = nil;
-		this.changed(\removeCtl, num, name);
+		if(midiFuncs[key].notNil) {
+			midiFuncs[key][\resp].free;
+			midiFuncs[key] = nil;
+			this.changed(\removeCtl, num, name);
+		};
 	}
 
 	editCtl { |num, name, spec|
