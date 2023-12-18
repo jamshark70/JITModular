@@ -55,7 +55,12 @@ JMMIDI_OSCBridge {
 			this.removeCtl(num, name)
 		})
 		.put(\learning, { |obj, what, name, spec|
-			learning.put(name, spec)
+			// note: if spec wasn't given, we want JMMIDI to look it up
+			// in the proxyspace.
+			// but a dictionary cannot contain nil
+			// so a nil spec needs a wrapper (Ref)
+			// ... we will unwrap later when processing the 'learning' entries
+			learning.put(name, `spec)
 		})
 		// .put(\learned, { |num, name|
 		// 	learning.clear;
@@ -64,7 +69,7 @@ JMMIDI_OSCBridge {
 
 		midi.midiFuncs.do { |midiResp|
 			if(#[noteOn, noteOff].includes(midiResp[\name]).not) {
-				this.addCtl(midiResp[\num].debug("osc addctl"), midiResp[\name].debug("name"), midiResp[\spec].debug("spec"));
+				this.addCtl(midiResp[\num], midiResp[\name], midiResp[\spec]);
 			};
 		};
 
@@ -83,7 +88,7 @@ JMMIDI_OSCBridge {
 					};
 				};
 				learning.keysValuesDo { |name, controlSpec|
-					midi.addCtl(spec[0], name, controlSpec);
+					midi.addCtl(spec[0], name, controlSpec.dereference);
 				};  // otherwise ignore unknown (bc this function gets *everything*)
 				learning.clear;
 			};
