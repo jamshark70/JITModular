@@ -1,3 +1,23 @@
+/***
+
+Notice of GPL compliance
+
+Much of the code in this file consists of modified versions of code from
+the Just-In-Time Library, released under GPLv3 as part of the SuperCollider
+package. I needed to override just a couple of critical places, but there
+aren't many method hooks to do so.
+
+Full credit to the authors of JITLib: Julian Rohrhuber, Alberto de Campo,
+and many others.
+
+I intend these methods as derivative works, released in source form back
+to the community, under GPLv3. I am expressly not claiming authorship
+for the portions of this code not written by myself.
+
+-- H. James Harkins
+
+***/
+
 + Object {
 	makeStereoProxyControl { | channelOffset = 0, proxy |
 		if(this.isKindOf(Function)) {
