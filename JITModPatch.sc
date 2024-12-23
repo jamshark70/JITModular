@@ -251,7 +251,7 @@ JITModPatch {
 	}
 
 	prSave { |p|
-		var file = File(p, "w");
+		var file = CollStream.new, handle;
 		var text,
 		getDoc = { |cond|
 			// hacking into Document internals a bit
@@ -266,61 +266,65 @@ JITModPatch {
 			};
 			ScIDE.getTextByQUuid(doc.quuid, funcID, 0, -1);
 		};
-		if(file.isOpen) {
-			this.path = p;
-			{
-				var cond = Condition.new;
-				protect {
-					// file's end result should be the patch
-					file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
-					.format(proxyspace.class.name, name.asCompileString);
-					getDoc.value(cond);
-					cond.hang;
-					text = text.clump(8000);
-					file << "var doc = [";
-					text.do { |str, i|
-						if(i > 0) { file << "," };
-						file << "\n\t" <<< str;
-					};
-					file << "\n].join;\n\n";
-					file << "var customInit = " <<< customInit << ";\n";
-					file << "var cleanup = " <<< cleanup << ";\n";
-					if(buffers.notEmpty) {
-						buffers.save(path);
-						buffers.storeOn(file);
-					};
-					if(midi.notNil) {
-						file << "midi = ";
-						midi.storeOn(file);
-						file << "(proxyspace);\n";
-					};
-					file << "\nproxyspace.use {\n\n";
-					// guarantee that buffer proxies get populated first
-					// otherwise patterns may look for ~xyz.source and find nothing
-					buffers.buffers.keysValuesDo { |name, buf|
-						file << "~" << name << " = buffers.asRef(" <<< name << ");\n";
-					};
-					file << "\n";
-					proxyspace.use { proxyspace.storeOn2(file) };
-					file << "\};\n";
-					// result for loading, should embed real objects
-					file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers, customInit: customInit, cleanup: cleanup)\n";
-				} { |error|
-					file.close;
-					defer {  // defer to allow error to clear before handling
-						if(error.notNil) {
-							this.changed(\save, \error, error);
-						} {
-							this.dirty = false;
-							this.changed(\save, \success);
-						}
-					};
+		{
+			var cond = Condition.new;
+			protect {
+				// file's end result should be the patch
+				file << "var proxyspace = %.new(name: %), buffers, midi;\n\n"
+				.format(proxyspace.class.name, name.asCompileString);
+				getDoc.value(cond);
+				cond.hang;
+				text = text.clump(8000);
+				file << "var doc = [";
+				text.do { |str, i|
+					if(i > 0) { file << "," };
+					file << "\n\t" <<< str;
 				};
-			}.fork(AppClock);
-		} {
-			"JITModPatch:% could not open '%' for saving".format(name, path).warn;
-			this.changed(\save, \openFailed);
-		}
+				file << "\n].join;\n\n";
+				file << "var customInit = " <<< customInit << ";\n";
+				file << "var cleanup = " <<< cleanup << ";\n";
+				if(buffers.notEmpty) {
+					buffers.save(path);
+					buffers.storeOn(file);
+				};
+				if(midi.notNil) {
+					file << "midi = ";
+					midi.storeOn(file);
+					file << "(proxyspace);\n";
+				};
+				file << "\nproxyspace.use {\n\n";
+				// guarantee that buffer proxies get populated first
+				// otherwise patterns may look for ~xyz.source and find nothing
+				buffers.buffers.keysValuesDo { |name, buf|
+					file << "~" << name << " = buffers.asRef(" <<< name << ");\n";
+				};
+				file << "\n";
+				proxyspace.use { proxyspace.storeOn2(file) };
+				file << "\};\n";
+				// result for loading, should embed real objects
+				file << "(name: " <<< name << ", proxyspace: proxyspace, string: doc, midi: midi, buffers: buffers, customInit: customInit, cleanup: cleanup)\n";
+
+				// now we know that it didn't crash to get file contents
+				handle = File(p, "w");
+				if(handle.isOpen) {
+					this.path = p;
+					handle << file.collection;
+				} {
+					"JITModPatch:% could not open '%' for saving".format(name, path).warn;
+					this.changed(\save, \openFailed);
+				}
+			} { |error|
+				handle.close;
+				defer {  // defer to allow error to clear before handling
+					if(error.notNil) {
+						this.changed(\save, \error, error);
+					} {
+						this.dirty = false;
+						this.changed(\save, \success);
+					}
+				};
+			};
+		}.fork(AppClock);
 	}
 
 	docTitle { ^"JITModPatch: " ++ (name ?? "Untitled") }
