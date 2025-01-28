@@ -285,7 +285,13 @@ JMDecompiler {
 		case
 		{ proxy.objects[0].isKindOf(SynthDefControl) } {
 			def = proxy.objects[0].synthDef;
-			numOutputs = def.children.last.inputs.size - 1;
+			numOutputs = def.children.last.inputs;
+			// if code exists in the class library that will remove duplicated math ops,
+			// then Out's inputs array must be reduced too.
+			if(#['UGenCache', 'UGenResourceManager'].any { |key| key.asClass.notNil }) {
+				numOutputs = numOutputs.as(IdentitySet);
+			};
+			numOutputs = numOutputs.size - 1;
 			(0 .. def.children.size - 6 - numOutputs).do { |i|
 				ugen = def.children[i];
 				if(ugen.decompilerCanOptimizeOut(key, this).not) {
