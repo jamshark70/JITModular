@@ -117,7 +117,7 @@
 			<< ", [";
 			contents[0].value.do { |val, i|
 				if(i > 0) { stream << ", " };
-				stream << val;
+				stream <<< if(contents[0].key == \gt) { 1.0 } { val };
 			};
 			stream << "])";
 		} {
@@ -144,7 +144,8 @@
 				if(i > 0) { stream << ", " };
 				assn.value.asArray.do { |item, j|
 					if(j > 0) { stream << ", " };
-					stream <<< item;
+					stream << if(assn.key == \gt) { 1.0 } { item };
+					// stream <<< item;
 				};
 			};
 			stream << "])";
