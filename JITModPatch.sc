@@ -284,7 +284,7 @@ JITModPatch {
 				file << "var customInit = " <<< customInit << ";\n";
 				file << "var cleanup = " <<< cleanup << ";\n";
 				if(buffers.notEmpty) {
-					buffers.save(path);
+					buffers.save(p);
 					buffers.storeOn(file);
 				};
 				if(midi.notNil) {
