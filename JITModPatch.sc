@@ -891,12 +891,13 @@ JMBufferSet {
 		};
 		buffers.keysValuesDo { |name, buffer|
 			var format, match;
+			format = buffer.tryPerform(\format);
 			if(buffer.tryPerform(\isWavetable) == true) {
 				name = name ++ "_wt";
-				format = "float";
+				format = format ?? { "float" };
 			} {
 				name = name.asString;
-				format = "int16";
+				format = format ?? { "int16" };
 			};
 			if(buffer.tryPerform(\arrayID).notNil) {
 				// mark buffer arrays with filenames like "a[000]_wt.wav"
@@ -1021,7 +1022,7 @@ JMBufferRef {
 }
 
 JMBuf : Buffer {
-	var <>isWavetable = false, <pending, <>arrayID, resp;
+	var <>isWavetable = false, <pending, <>arrayID, resp, >format;
 
 	*allocConsecutive { arg numBufs = 1, server, numFrames, numChannels = 1, completionMessage, bufnum;
 		var	bufBase, newBuf;
@@ -1174,6 +1175,12 @@ JMBuf : Buffer {
 		pending = '/b_gen';
 		// this.changed(\contents);
 		^result
+	}
+
+	format {
+		^if(format.isNil) {
+			if(isWavetable) { "float" } { "int16" }
+		} { format }
 	}
 }
 
